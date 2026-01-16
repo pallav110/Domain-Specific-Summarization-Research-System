@@ -1,0 +1,29 @@
+{
+  "name": "research-summarization-system",
+  "version": "1.0.0",
+  "description": "Domain-Specific Abstractive Summarization Research System",
+  "main": "backend/main.py",
+  "directories": {
+    "backend": "FastAPI backend with ML models",
+    "frontend": "Next.js frontend",
+    "n8n": "Automation workflows",
+    "sample_data": "Sample legal and medical documents"
+  },
+  "scripts": {
+    "setup": "Windows: setup.bat",
+    "backend": "Windows: start_backend.bat",
+    "frontend": "Windows: start_frontend.bat"
+  },
+  "keywords": [
+    "nlp",
+    "summarization",
+    "legal",
+    "medical",
+    "bert",
+    "gpt",
+    "research",
+    "machine-learning"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

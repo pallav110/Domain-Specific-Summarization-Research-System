@@ -1,0 +1,70 @@
+# Core Framework
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pydantic-settings
+# Database
+sqlalchemy
+alembic
+psycopg2-binary
+aiosqlite
+
+# Document Processing
+PyPDF2
+pdfplumber
+python-docx
+pypandoc
+
+# NLP & ML Core
+transformers
+sentencepiece
+protobuf
+# LangChain Ecosystem
+langchain
+langchain-community
+langchain-openai
+langchain-huggingface
+tiktoken
+
+# Summarization Models
+# BART, PEGASUS, T5 will be loaded via transformers
+
+# Domain-Specific Models
+# legal-bert, clinical-bert via transformers
+
+# Evaluation Metrics
+rouge-score
+bert-score
+nltk
+sacrebleu
+
+# Factuality Checking
+sentence-transformers
+scikit-learn
+
+# Google Gemini Integration (Free API available!)
+google-generativeai
+
+# Optional: OpenAI (if you have API key)
+# openai
+
+# Utilities
+python-dotenv
+httpx
+aiofiles
+pandas
+numpy
+tqdm    
+
+# Logging & Monitoring
+loguru
+
+# CORS & Security
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Testing
+pytest
+pytest-asyncio
+httpx
