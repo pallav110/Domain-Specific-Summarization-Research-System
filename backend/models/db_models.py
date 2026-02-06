@@ -19,12 +19,10 @@ class ModelType(str, enum.Enum):
     """Summarization Model Types"""
     BART = "bart"
     PEGASUS = "pegasus"
-    T5 = "t5"
     LEGAL_BERT_PEGASUS = "legal_bert_pegasus"
     CLINICAL_BERT_PEGASUS = "clinical_bert_pegasus"
     GEMINI = "gemini"  # Google Gemini (FREE!)
-    GPT = "gpt"  # OpenAI GPT (paid)
-    GENERIC = "generic"
+    GPT = "gpt"  # OpenAI GPT (optional, paid)
 
 
 class Document(Base):

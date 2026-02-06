@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Loader2, BarChart3, TrendingUp, Award } from 'lucide-react'
+import { Loader2, BarChart3, TrendingUp, Award, Download } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -231,6 +231,41 @@ export default function DashboardPage() {
               consistency with source document
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Export Section */}
+      <div className="card">
+        <h2 className="text-xl font-bold mb-4 text-gray-800">Export Research Data</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Download evaluation results for external analysis in Python, R, or Excel.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href={`${API_URL}/api/v1/export/csv`}
+            className="btn-primary inline-flex items-center space-x-2"
+            download
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </a>
+          <a
+            href={`${API_URL}/api/v1/export/json`}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 inline-flex items-center space-x-2"
+            download
+          >
+            <Download className="w-4 h-4" />
+            <span>Export JSON</span>
+          </a>
+          <a
+            href={`${API_URL}/api/v1/statistics/analysis`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 inline-flex items-center space-x-2"
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>View Statistical Analysis</span>
+          </a>
         </div>
       </div>
     </div>

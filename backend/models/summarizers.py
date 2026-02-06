@@ -122,6 +122,8 @@ class PegasusSummarizer(BaseSummarizer):
                 )
             
             summary = self.tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            # Clean up PEGASUS <n> newline tokens that leak into output
+            summary = summary.replace(".<n>", ". ").replace("<n>", " ").strip()
             generation_time = time.time() - start_time
             
             return {
@@ -138,7 +140,17 @@ class PegasusSummarizer(BaseSummarizer):
 
 
 class DomainSpecificSummarizer(BaseSummarizer):
-    """Domain-specific summarizer using BERT + PEGASUS"""
+    """
+    Domain-specific summarizer using BERT (extractive) + PEGASUS (abstractive).
+    
+    Two-stage pipeline:
+      1. Domain BERT encodes sentences and scores them for domain relevance
+         (Legal-BERT for legal docs, Clinical-BERT for medical docs)
+      2. Top-ranked sentences are fed to PEGASUS for abstractive summarization
+    
+    This ensures the domain BERT model genuinely influences the output by
+    performing domain-aware extractive pre-selection before abstraction.
+    """
     
     def __init__(self, domain: str):
         """
@@ -156,24 +168,109 @@ class DomainSpecificSummarizer(BaseSummarizer):
         
         super().__init__(bert_model)
         
-        # Use PEGASUS for actual summarization
+        # Stage 1: Domain BERT for extractive sentence scoring
+        from transformers import AutoModel
+        self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
+        self.bert_model = AutoModel.from_pretrained(bert_model)
+        self.bert_model.to(self.device)
+        self.bert_model.eval()
+        
+        # Stage 2: PEGASUS for abstractive generation
         self.pegasus_tokenizer = AutoTokenizer.from_pretrained(settings.PEGASUS_MODEL)
         self.pegasus_model = PegasusForConditionalGeneration.from_pretrained(settings.PEGASUS_MODEL)
         self.pegasus_model.to(self.device)
         self.pegasus_model.eval()
         
-        # BERT for encoding (optional - can enhance context)
-        self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
+        logger.info(f"Domain-specific pipeline initialized: {bert_model} -> PEGASUS")
+    
+    def _split_sentences(self, text: str) -> List[str]:
+        """Split text into sentences"""
+        import re
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        return [s.strip() for s in sentences if len(s.strip()) > 10]
+    
+    def _score_sentences(self, sentences: List[str]) -> List[float]:
+        """
+        Score sentences using domain BERT embeddings.
+        Sentences whose embeddings are closest to the document-level
+        embedding (centroid) are considered most domain-relevant.
+        """
+        if not sentences:
+            return []
+        
+        embeddings = []
+        for sentence in sentences:
+            inputs = self.bert_tokenizer(
+                sentence,
+                max_length=512,
+                truncation=True,
+                padding=True,
+                return_tensors="pt"
+            ).to(self.device)
+            
+            with torch.no_grad():
+                outputs = self.bert_model(**inputs)
+                # Use [CLS] token embedding as sentence representation
+                cls_embedding = outputs.last_hidden_state[:, 0, :]
+                embeddings.append(cls_embedding.squeeze(0))
+        
+        # Stack all embeddings and compute document centroid
+        emb_matrix = torch.stack(embeddings)  # (N, hidden_dim)
+        centroid = emb_matrix.mean(dim=0, keepdim=True)  # (1, hidden_dim)
+        
+        # Cosine similarity of each sentence to the centroid
+        similarities = torch.nn.functional.cosine_similarity(emb_matrix, centroid)
+        scores = similarities.cpu().tolist()
+        
+        return scores
+    
+    def _extract_top_sentences(self, text: str, top_ratio: float = 0.6) -> str:
+        """
+        Extract top domain-relevant sentences using BERT scoring.
+        Returns a condensed version of the text ordered by original position.
+        """
+        sentences = self._split_sentences(text)
+        
+        if len(sentences) <= 3:
+            return text  # Too short to extract from
+        
+        scores = self._score_sentences(sentences)
+        
+        # Pair sentences with scores and original indices
+        scored = list(enumerate(zip(sentences, scores)))
+        
+        # Select top N sentences by score
+        n_select = max(3, int(len(sentences) * top_ratio))
+        scored_sorted = sorted(scored, key=lambda x: x[1][1], reverse=True)
+        top_indices = sorted([idx for idx, _ in scored_sorted[:n_select]])
+        
+        # Reconstruct text in original order
+        extracted = " ".join(sentences[i] for i in top_indices)
+        
+        logger.info(
+            f"Domain BERT extracted {len(top_indices)}/{len(sentences)} sentences "
+            f"(top scores: {sorted(scores, reverse=True)[:3]})"
+        )
+        
+        return extracted
     
     def summarize(self, text: str, max_length: int = 512, min_length: int = 100) -> Dict:
-        """Generate domain-aware summary"""
+        """
+        Generate domain-aware summary using two-stage pipeline:
+        1. Domain BERT extracts most relevant sentences
+        2. PEGASUS generates abstractive summary from extracted content
+        """
         start_time = time.time()
         
         try:
-            # Use PEGASUS with domain context
-            # In production, you would fine-tune PEGASUS on domain data
+            # Stage 1: Domain BERT extractive pre-selection
+            logger.info(f"Stage 1: {self.domain} BERT extractive scoring...")
+            extracted_text = self._extract_top_sentences(text, top_ratio=0.6)
+            
+            # Stage 2: PEGASUS abstractive generation on extracted content
+            logger.info("Stage 2: PEGASUS abstractive generation...")
             inputs = self.pegasus_tokenizer(
-                text,
+                extracted_text,
                 max_length=1024,
                 truncation=True,
                 return_tensors="pt"
@@ -190,6 +287,8 @@ class DomainSpecificSummarizer(BaseSummarizer):
                 )
             
             summary = self.pegasus_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            # Clean up PEGASUS <n> newline tokens
+            summary = summary.replace(".<n>", ". ").replace("<n>", " ").strip()
             generation_time = time.time() - start_time
             
             return {
@@ -198,7 +297,8 @@ class DomainSpecificSummarizer(BaseSummarizer):
                 "model_type": f"{self.domain}_bert_pegasus",
                 "generation_time": generation_time,
                 "summary_length": len(summary.split()),
-                "domain": self.domain
+                "domain": self.domain,
+                "pipeline": f"{self.model_name} (extract) + PEGASUS (abstract)"
             }
             
         except Exception as e:
@@ -460,7 +560,7 @@ class SummarizationEngine:
         
         if hasattr(summarizer, 'summarize'):
             if model_type in ["gpt", "gemini"]:
-                return summarizer.summarize(text, max_length, min_length, domain)
+                return summarizer.summarize(text, max_length, min_length, domain=domain)
             else:
                 return summarizer.summarize(text, max_length, min_length)
         else:

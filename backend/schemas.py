@@ -18,12 +18,10 @@ class ModelType(str, Enum):
     """Model Types"""
     BART = "bart"
     PEGASUS = "pegasus"
-    T5 = "t5"
     LEGAL_BERT_PEGASUS = "legal_bert_pegasus"
     CLINICAL_BERT_PEGASUS = "clinical_bert_pegasus"
     GEMINI = "gemini"  # Google Gemini (FREE!)
-    GPT = "gpt"  # OpenAI GPT (paid)
-    GENERIC = "generic"
+    GPT = "gpt"  # OpenAI GPT (optional, paid)
 
 
 # Document Schemas
@@ -127,16 +125,16 @@ class ExperimentRequest(BaseModel):
 
 class ExperimentResponse(BaseModel):
     """Experiment response"""
-    experiment_id: int
+    id: int
     experiment_name: str
     document_id: int
     domain: DomainType
     models_tested: List[str]
-    results_summary: Optional[Dict[str, Any]]
-    best_model: Optional[str]
+    results_summary: Optional[Dict[str, Any]] = None
+    best_model: Optional[str] = None
     status: str
     started_at: datetime
-    completed_at: Optional[datetime]
+    completed_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True

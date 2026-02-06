@@ -3,11 +3,15 @@ FastAPI Application - Additional Endpoints
 Experiment, Comparison, and Dashboard endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from typing import List, Dict, Optional
 from datetime import datetime
 from loguru import logger
+import json
+import csv
+import io
 
 from database import get_db
 from models.db_models import Document, Summary, Experiment, Evaluation, DomainType, ModelType
@@ -392,4 +396,240 @@ async def get_research_results(
         
     except Exception as e:
         logger.error(f"Research results error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== EXPORT ENDPOINTS ====================
+
+async def _get_export_data(db: AsyncSession, domain: Optional[str] = None) -> List[Dict]:
+    """Shared helper to get evaluation data for export"""
+    query = (
+        select(Summary, Evaluation, Document)
+        .join(Document, Summary.document_id == Document.id)
+        .outerjoin(Evaluation, Summary.id == Evaluation.summary_id)
+    )
+    
+    if domain:
+        query = query.where(Document.detected_domain == DomainType(domain))
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    data = []
+    for summary, evaluation, doc in rows:
+        row = {
+            'document_id': doc.id,
+            'document_name': doc.original_filename,
+            'domain': doc.detected_domain.value if doc.detected_domain else 'unknown',
+            'word_count': doc.word_count,
+            'model_type': summary.model_type.value if summary.model_type else '',
+            'model_name': summary.model_name,
+            'summary_length': summary.summary_length,
+            'generation_time': summary.generation_time or 0.0,
+            'summary_text': summary.summary_text,
+        }
+        
+        if evaluation:
+            row.update({
+                'rouge_1_f': evaluation.rouge_1_f or 0.0,
+                'rouge_2_f': evaluation.rouge_2_f or 0.0,
+                'rouge_l_f': evaluation.rouge_l_f or 0.0,
+                'bertscore_f1': evaluation.bertscore_f1 or 0.0,
+                'factuality_score': evaluation.factuality_score or 0.0,
+                'compression_ratio': evaluation.compression_ratio or 0.0,
+                'semantic_similarity': evaluation.semantic_similarity or 0.0,
+            })
+        else:
+            row.update({
+                'rouge_1_f': None,
+                'rouge_2_f': None,
+                'rouge_l_f': None,
+                'bertscore_f1': None,
+                'factuality_score': None,
+                'compression_ratio': None,
+                'semantic_similarity': None,
+            })
+        
+        data.append(row)
+    
+    return data
+
+
+@router.get("/export/json")
+async def export_json(
+    domain: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Export all evaluation results as JSON.
+    Suitable for analysis in Python, R, or JavaScript.
+    """
+    try:
+        data = await _get_export_data(db, domain)
+        
+        export = {
+            'export_timestamp': datetime.utcnow().isoformat(),
+            'total_records': len(data),
+            'domain_filter': domain,
+            'results': data
+        }
+        
+        json_str = json.dumps(export, indent=2, default=str)
+        
+        return StreamingResponse(
+            io.BytesIO(json_str.encode('utf-8')),
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename=research_results_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+            }
+        )
+    
+    except Exception as e:
+        logger.error(f"JSON export error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/export/csv")
+async def export_csv(
+    domain: Optional[str] = None,
+    include_summary_text: bool = False,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Export all evaluation results as CSV.
+    Suitable for analysis in Excel, R, or Python pandas.
+    """
+    try:
+        data = await _get_export_data(db, domain)
+        
+        if not data:
+            raise HTTPException(status_code=404, detail="No data to export")
+        
+        output = io.StringIO()
+        
+        # Determine fields (optionally exclude summary_text for cleaner CSV)
+        fieldnames = list(data[0].keys())
+        if not include_summary_text:
+            fieldnames = [f for f in fieldnames if f != 'summary_text']
+        
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
+        writer.writeheader()
+        
+        for row in data:
+            if not include_summary_text:
+                row = {k: v for k, v in row.items() if k != 'summary_text'}
+            writer.writerow(row)
+        
+        output.seek(0)
+        
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=research_results_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+            }
+        )
+    
+    except Exception as e:
+        logger.error(f"CSV export error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== STATISTICAL ANALYSIS ENDPOINT ====================
+
+@router.get("/statistics/analysis")
+async def get_statistical_analysis(
+    domain: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get statistical analysis of model performance.
+    Computes per-model averages, std dev, and comparative rankings.
+    Useful for research papers and hypothesis testing.
+    """
+    try:
+        data = await _get_export_data(db, domain)
+        
+        if not data:
+            return {
+                'message': 'No evaluation data available',
+                'models': {},
+                'domain_analysis': {}
+            }
+        
+        # Group by model_type
+        from collections import defaultdict
+        import math
+        
+        model_metrics = defaultdict(lambda: defaultdict(list))
+        domain_model_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        
+        metric_keys = ['rouge_1_f', 'rouge_2_f', 'rouge_l_f', 'bertscore_f1',
+                        'factuality_score', 'compression_ratio', 'semantic_similarity',
+                        'generation_time']
+        
+        for row in data:
+            model = row['model_type']
+            doc_domain = row['domain']
+            
+            for key in metric_keys:
+                val = row.get(key)
+                if val is not None:
+                    model_metrics[model][key].append(val)
+                    domain_model_metrics[doc_domain][model][key].append(val)
+        
+        def compute_stats(values):
+            if not values:
+                return {'mean': 0.0, 'std': 0.0, 'min': 0.0, 'max': 0.0, 'count': 0}
+            n = len(values)
+            mean = sum(values) / n
+            variance = sum((x - mean) ** 2 for x in values) / n if n > 1 else 0.0
+            return {
+                'mean': round(mean, 4),
+                'std': round(math.sqrt(variance), 4),
+                'min': round(min(values), 4),
+                'max': round(max(values), 4),
+                'count': n
+            }
+        
+        # Per-model stats
+        model_stats = {}
+        for model, metrics in model_metrics.items():
+            model_stats[model] = {
+                key: compute_stats(vals) for key, vals in metrics.items()
+            }
+        
+        # Per-domain-per-model stats (for domain-specific vs generic comparison)
+        domain_analysis = {}
+        for doc_domain, models in domain_model_metrics.items():
+            domain_analysis[doc_domain] = {}
+            for model, metrics in models.items():
+                domain_analysis[doc_domain][model] = {
+                    key: compute_stats(vals) for key, vals in metrics.items()
+                }
+        
+        # Rankings by metric
+        rankings = {}
+        for metric in ['rouge_l_f', 'bertscore_f1', 'factuality_score', 'semantic_similarity']:
+            ranked = sorted(
+                model_stats.items(),
+                key=lambda x: x[1].get(metric, {}).get('mean', 0),
+                reverse=True
+            )
+            rankings[metric] = [
+                {'model': m, 'mean': s.get(metric, {}).get('mean', 0)}
+                for m, s in ranked
+            ]
+        
+        return {
+            'total_evaluations': len(data),
+            'models_tested': list(model_stats.keys()),
+            'per_model_statistics': model_stats,
+            'per_domain_analysis': domain_analysis,
+            'rankings': rankings,
+            'analysis_timestamp': datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        logger.error(f"Statistical analysis error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

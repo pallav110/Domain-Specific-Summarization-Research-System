@@ -416,7 +416,15 @@ async def evaluate_summary(
         return EvaluationResponse(
             evaluation_id=evaluation.id,
             summary_id=summary.id,
-            metrics=evaluation,
+            metrics={
+                "rouge_1_f": evaluation.rouge_1_f,
+                "rouge_2_f": evaluation.rouge_2_f,
+                "rouge_l_f": evaluation.rouge_l_f,
+                "bertscore_f1": evaluation.bertscore_f1,
+                "factuality_score": evaluation.factuality_score,
+                "compression_ratio": evaluation.compression_ratio,
+                "semantic_similarity": evaluation.semantic_similarity
+            },
             evaluated_at=evaluation.evaluated_at,
             evaluation_time=evaluation.evaluation_time
         )
@@ -424,6 +432,61 @@ async def evaluate_summary(
     except Exception as e:
         logger.error(f"Evaluation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== GET EVALUATION BY SUMMARY ====================
+
+@app.get("/api/v1/evaluations/summary/{summary_id}")
+async def get_evaluation_by_summary(
+    summary_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get evaluation metrics for a summary"""
+    result = await db.execute(
+        select(Evaluation)
+        .where(Evaluation.summary_id == summary_id)
+        .order_by(Evaluation.evaluated_at.desc())
+    )
+    evaluation = result.scalars().first()
+    
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="No evaluation found for this summary")
+    
+    return {
+        "id": evaluation.id,
+        "summary_id": evaluation.summary_id,
+        "rouge_1_f": evaluation.rouge_1_f,
+        "rouge_2_f": evaluation.rouge_2_f,
+        "rouge_l_f": evaluation.rouge_l_f,
+        "bertscore_f1": evaluation.bertscore_f1,
+        "factuality_score": evaluation.factuality_score,
+        "compression_ratio": evaluation.compression_ratio,
+        "semantic_similarity": evaluation.semantic_similarity,
+        "evaluated_at": evaluation.evaluated_at,
+        "evaluation_time": evaluation.evaluation_time,
+    }
+
+
+# ==================== DELETE DOCUMENT ====================
+
+@app.delete("/api/v1/documents/{document_id}")
+async def delete_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a document and all its summaries/evaluations"""
+    result = await db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    await db.delete(document)
+    await db.commit()
+    
+    return {"message": f"Document {document_id} deleted successfully"}
 
 
 # Include extended API routes

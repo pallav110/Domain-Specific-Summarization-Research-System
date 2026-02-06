@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     # Generic Models
     BART_MODEL: str = "facebook/bart-large-cnn"
     PEGASUS_MODEL: str = "google/pegasus-cnn_dailymail"
-    T5_MODEL: str = "t5-base"
     
     # Domain-Specific Models
     LEGAL_BERT_MODEL: str = "nlpaueb/legal-bert-base-uncased"
