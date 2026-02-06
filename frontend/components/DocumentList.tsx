@@ -52,7 +52,7 @@ export default function DocumentList({ limit, highlightId }: Props) {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-700 animate-spin" />
       </div>
     )
   }
@@ -91,10 +91,10 @@ export default function DocumentList({ limit, highlightId }: Props) {
         <Link
           key={doc.id}
           href={`/documents/${doc.id}`}
-          className={`block p-4 rounded-lg border transition-all hover:shadow-md ${
+          className={`block p-4 rounded-md border transition-all hover:border-slate-300 ${
             highlightId === doc.id
-              ? 'border-primary-500 bg-primary-50'
-              : 'border-gray-200 hover:border-primary-300'
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-slate-200'
           }`}
         >
           <div className="flex items-start justify-between">

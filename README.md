@@ -2,7 +2,7 @@
 
 A comprehensive research system for comparing generic vs domain-specific NLP models for legal and medical document summarization.
 
-## 📋 Table of Contents
+## Table of Contents
 - [Overview](#overview)
 - [Research Question](#research-question)
 - [Architecture](#architecture)
@@ -17,7 +17,7 @@ A comprehensive research system for comparing generic vs domain-specific NLP mod
 - [Research Guidelines](#research-guidelines)
 - [Troubleshooting](#troubleshooting)
 
-## 🎯 Overview
+## Overview
 
 This system enables undergraduate research on domain-specific abstractive summarization by providing:
 - Automated document processing and domain classification
@@ -27,7 +27,7 @@ This system enables undergraduate research on domain-specific abstractive summar
 - Automated workflows via n8n
 - Publication-ready experimental results
 
-## 🔬 Research Question
+## Research Question
 
 **"Does domain-specific NLP significantly improve summarization quality over generic models?"**
 
@@ -40,7 +40,7 @@ On two domains:
 - **Legal**: Contracts, court judgments, legal documents
 - **Medical**: Clinical notes, patient records, medical research papers
 
-## 🏗 Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -66,7 +66,7 @@ On two domains:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Backend
 - **Framework**: FastAPI
@@ -93,7 +93,7 @@ On two domains:
 - **HTTP Client**: Axios
 
 
-## 📦 Setup & Installation
+## Setup & Installation
 
 ### Prerequisites
 - Python 3.9+
@@ -167,7 +167,7 @@ n8n start
 
 n8n will start at http://localhost:5678
 
-## 🚀 Usage
+## Usage
 
 ### Basic Workflow
 
@@ -196,7 +196,7 @@ n8n will start at http://localhost:5678
    - Analyze trends across experiments
    - Export data for publication
 
-## 🧪 Running Experiments
+## Running Experiments
 
 ### Single Document Experiment
 
@@ -230,7 +230,7 @@ curl -X POST http://localhost:8000/api/v1/experiments \
   }'
 ```
 
-## 📚 API Documentation
+## API Documentation
 
 ### Documents
 
@@ -317,7 +317,7 @@ GET /api/v1/dashboard/stats
 GET /api/v1/research/results?domain=legal
 ```
 
-## 🖥 Frontend Features
+## Frontend Features
 
 ### Pages
 
@@ -346,7 +346,7 @@ GET /api/v1/research/results?domain=legal
    - Charts and visualizations
    - Research insights
 
-## 📊 Evaluation Metrics
+## Evaluation Metrics
 
 ### ROUGE (Recall-Oriented Understudy for Gisting Evaluation)
 - **ROUGE-1**: Unigram overlap
@@ -374,7 +374,7 @@ GET /api/v1/research/results?domain=legal
 - Cosine similarity of sentence embeddings
 - **Range**: 0.0 to 1.0 (higher is better)
 
-## 📁 Sample Data
+## Sample Data
 
 Sample documents are provided in `sample_data/`:
 
@@ -393,7 +393,7 @@ cd backend
 python scripts/load_sample_data.py
 ```
 
-## 📖 Research Guidelines
+## Research Guidelines
 
 ### For Undergraduate Research Projects
 
@@ -446,7 +446,7 @@ from models.db_models import Experiment, Summary, Evaluation
    - Test legal models on medical docs (and vice versa)
    - Measure domain specificity importance
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Backend Issues
 
@@ -496,7 +496,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 - Verify API key in backend/.env
 - Check API quota and billing
 
-## 📝 Citation
+## Citation
 
 If you use this system for research, please cite:
 
@@ -509,11 +509,11 @@ If you use this system for research, please cite:
 }
 ```
 
-## 📄 License
+## License
 
 MIT License - See LICENSE file
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please:
 1. Fork the repository
@@ -521,13 +521,13 @@ Contributions welcome! Please:
 3. Make your changes
 4. Submit a pull request
 
-## 📧 Support
+## Support
 
 For questions or issues:
 - Open a GitHub issue
 - Email: your.email@university.edu
 
-## 🎓 Acknowledgments
+## Acknowledgments
 
 - Hugging Face for transformer models
 - OpenAI for GPT-4 API
@@ -536,4 +536,4 @@ For questions or issues:
 
 ---
 
-**Happy Researching! 🚀**
+**Happy researching.**

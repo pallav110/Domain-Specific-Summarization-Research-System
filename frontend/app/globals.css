@@ -17,29 +17,24 @@
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: #0f172a;
+  background: #f7f9fb;
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors font-medium;
+    @apply bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors font-semibold;
   }
-  
+
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium;
+    @apply bg-slate-100 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-200 transition-colors font-semibold;
   }
-  
+
   .card {
-    @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+    @apply bg-white rounded-md p-6 border border-slate-200;
   }
-  
+
   .input {
-    @apply border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary-500;
+    @apply border border-slate-300 rounded-md px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500;
   }
 }

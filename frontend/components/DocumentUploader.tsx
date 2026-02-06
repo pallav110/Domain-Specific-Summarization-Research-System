@@ -73,17 +73,17 @@ export default function DocumentUploader({ onUploadSuccess }: Props) {
     <div className="space-y-4">
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+        className={`border-2 border-dashed rounded-md p-8 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-primary-500 bg-primary-50'
-            : 'border-gray-300 hover:border-primary-400'
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-slate-300 hover:border-blue-400'
         } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <input {...getInputProps()} />
         
         <div className="flex flex-col items-center space-y-3">
           {uploading ? (
-            <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+            <Loader2 className="w-12 h-12 text-blue-700 animate-spin" />
           ) : (
             <Upload className="w-12 h-12 text-gray-400" />
           )}
@@ -101,7 +101,7 @@ export default function DocumentUploader({ onUploadSuccess }: Props) {
 
       {/* Upload Result */}
       {uploadResult && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
           <div className="flex items-start space-x-3">
             <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -112,7 +112,7 @@ export default function DocumentUploader({ onUploadSuccess }: Props) {
                 <p><strong>Words:</strong> {uploadResult.word_count.toLocaleString()}</p>
                 <p>
                   <strong>Domain:</strong>{' '}
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
                     {uploadResult.detected_domain.toUpperCase()}
                   </span>
                   {' '}({(uploadResult.domain_confidence * 100).toFixed(1)}% confidence)
@@ -120,9 +120,9 @@ export default function DocumentUploader({ onUploadSuccess }: Props) {
               </div>
               <a
                 href={`/documents/${uploadResult.document_id}`}
-                className="inline-block mt-3 text-sm font-medium text-primary-600 hover:text-primary-700"
+                className="inline-block mt-3 text-sm font-medium text-blue-700 hover:text-blue-800"
               >
-                View Document Details →
+                View document details
               </a>
             </div>
           </div>

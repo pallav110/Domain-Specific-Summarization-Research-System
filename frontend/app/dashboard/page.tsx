@@ -56,7 +56,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+        <Loader2 className="w-12 h-12 text-blue-700 animate-spin" />
       </div>
     )
   }
@@ -92,50 +92,50 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-3">
-        <BarChart3 className="w-8 h-8 text-primary-600" />
-        <h1 className="text-3xl font-bold text-gray-800">Research Dashboard</h1>
+        <BarChart3 className="w-8 h-8 text-blue-700" />
+        <h1 className="text-3xl font-semibold text-slate-900">Research Dashboard</h1>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card bg-gradient-to-br from-blue-50 to-blue-100">
+        <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-blue-600 font-medium">Total Documents</p>
-              <p className="text-3xl font-bold text-blue-900 mt-1">
+              <p className="text-sm text-slate-600 font-medium">Total Documents</p>
+              <p className="text-3xl font-semibold text-slate-900 mt-1">
                 {stats.total_documents}
               </p>
             </div>
-            <div className="bg-blue-200 p-3 rounded-lg">
-              <BarChart3 className="w-8 h-8 text-blue-600" />
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <BarChart3 className="w-8 h-8 text-blue-700" />
             </div>
           </div>
         </div>
 
-        <div className="card bg-gradient-to-br from-green-50 to-green-100">
+        <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-green-600 font-medium">Total Summaries</p>
-              <p className="text-3xl font-bold text-green-900 mt-1">
+              <p className="text-sm text-slate-600 font-medium">Total Summaries</p>
+              <p className="text-3xl font-semibold text-slate-900 mt-1">
                 {stats.total_summaries}
               </p>
             </div>
-            <div className="bg-green-200 p-3 rounded-lg">
-              <TrendingUp className="w-8 h-8 text-green-600" />
+            <div className="bg-slate-100 p-3 rounded-lg">
+              <TrendingUp className="w-8 h-8 text-slate-700" />
             </div>
           </div>
         </div>
 
-        <div className="card bg-gradient-to-br from-purple-50 to-purple-100">
+        <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-purple-600 font-medium">Experiments</p>
-              <p className="text-3xl font-bold text-purple-900 mt-1">
+              <p className="text-sm text-slate-600 font-medium">Experiments</p>
+              <p className="text-3xl font-semibold text-slate-900 mt-1">
                 {stats.total_experiments}
               </p>
             </div>
-            <div className="bg-purple-200 p-3 rounded-lg">
-              <Award className="w-8 h-8 text-purple-600" />
+            <div className="bg-slate-100 p-3 rounded-lg">
+              <Award className="w-8 h-8 text-slate-700" />
             </div>
           </div>
         </div>
@@ -198,11 +198,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Research Insights */}
-      <div className="card bg-gradient-to-r from-primary-50 to-purple-50">
+      <div className="card bg-slate-50">
         <h2 className="text-xl font-bold mb-4 text-gray-800">Research Insights</h2>
         <div className="space-y-3 text-gray-700">
           <div className="flex items-start space-x-3">
-            <div className="bg-primary-600 rounded-full p-1 mt-1">
+            <div className="bg-blue-700 rounded-full p-1 mt-1">
               <div className="w-2 h-2 bg-white rounded-full"></div>
             </div>
             <p>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-start space-x-3">
-            <div className="bg-primary-600 rounded-full p-1 mt-1">
+            <div className="bg-blue-700 rounded-full p-1 mt-1">
               <div className="w-2 h-2 bg-white rounded-full"></div>
             </div>
             <p>
@@ -222,7 +222,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-start space-x-3">
-            <div className="bg-primary-600 rounded-full p-1 mt-1">
+            <div className="bg-blue-700 rounded-full p-1 mt-1">
               <div className="w-2 h-2 bg-white rounded-full"></div>
             </div>
             <p>
@@ -251,7 +251,7 @@ export default function DashboardPage() {
           </a>
           <a
             href={`${API_URL}/api/v1/export/json`}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 inline-flex items-center space-x-2"
+            className="btn-secondary inline-flex items-center space-x-2"
             download
           >
             <Download className="w-4 h-4" />
@@ -261,7 +261,7 @@ export default function DashboardPage() {
             href={`${API_URL}/api/v1/statistics/analysis`}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 inline-flex items-center space-x-2"
+            className="btn-secondary inline-flex items-center space-x-2"
           >
             <TrendingUp className="w-4 h-4" />
             <span>View Statistical Analysis</span>

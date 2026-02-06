@@ -135,7 +135,7 @@ export default function ComparePage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+        <Loader2 className="w-12 h-12 text-blue-700 animate-spin" />
       </div>
     )
   }
@@ -144,7 +144,7 @@ export default function ComparePage() {
     return (
       <div className="text-center py-12">
         <p className="text-red-600 text-lg">No summaries found for this document.</p>
-        <Link href={`/documents/${documentId}`} className="text-primary-600 hover:underline mt-2 inline-block">
+        <Link href={`/documents/${documentId}`} className="text-blue-700 hover:underline mt-2 inline-block">
           Go back and generate summaries
         </Link>
       </div>
@@ -223,7 +223,7 @@ export default function ComparePage() {
     <div className="space-y-6">
       <Link
         href={`/documents/${documentId}`}
-        className="inline-flex items-center space-x-2 text-primary-600 hover:text-primary-700"
+        className="inline-flex items-center space-x-2 text-blue-700 hover:text-blue-800"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Back to Document</span>
@@ -232,10 +232,10 @@ export default function ComparePage() {
       {/* Header */}
       <div className="card">
         <div className="flex items-center space-x-3 mb-2">
-          <Trophy className="w-8 h-8 text-yellow-500" />
-          <h1 className="text-3xl font-bold text-gray-800">Model Comparison</h1>
+          <Trophy className="w-8 h-8 text-blue-700" />
+          <h1 className="text-3xl font-semibold text-slate-900">Model Comparison</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-slate-600">
           Comparing {models.length} models on{' '}
           <span className="font-semibold">{document.original_filename}</span>
           {' '}({document.word_count} words, {document.detected_domain.toUpperCase()} domain)
@@ -265,18 +265,18 @@ export default function ComparePage() {
       </div>
 
       {!hasEvals && (
-        <div className="card bg-yellow-50 border border-yellow-200">
+        <div className="card bg-slate-50">
           <div className="flex items-start space-x-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-slate-500 mt-0.5" />
             <div>
-              <p className="font-medium text-yellow-800">No evaluation metrics computed yet</p>
-              <p className="text-sm text-yellow-700 mt-1">
+              <p className="font-medium text-slate-800">No evaluation metrics computed yet</p>
+              <p className="text-sm text-slate-600 mt-1">
                 Run evaluation to see ROUGE, BERTScore, and factuality comparisons.
               </p>
               <button
                 onClick={evaluateAll}
                 disabled={evaluatingAll}
-                className="mt-3 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 text-sm inline-flex items-center space-x-2"
+                className="mt-3 btn-primary text-sm inline-flex items-center space-x-2 disabled:opacity-50"
               >
                 {evaluatingAll ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /><span>Evaluating All...</span></>
@@ -389,9 +389,9 @@ export default function ComparePage() {
 
       {/* Best Model Summary */}
       {hasEvals && (
-        <div className="card bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200">
-          <h2 className="text-lg font-bold mb-3 text-gray-800 flex items-center space-x-2">
-            <Trophy className="w-5 h-5 text-yellow-500" />
+        <div className="card bg-slate-50">
+          <h2 className="text-lg font-semibold mb-3 text-slate-900 flex items-center space-x-2">
+            <Trophy className="w-5 h-5 text-blue-700" />
             <span>Best Model by Metric</span>
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -403,9 +403,9 @@ export default function ComparePage() {
               { label: 'Factuality', best: findBest(e => e.factuality_score) },
               { label: 'Semantic Sim.', best: findBest(e => e.semantic_similarity) },
             ].map(item => (
-              <div key={item.label} className="bg-white rounded-lg p-3 shadow-sm">
-                <p className="text-xs text-gray-500">{item.label}</p>
-                <p className="font-bold text-gray-800">{item.best || 'N/A'}</p>
+              <div key={item.label} className="bg-white rounded-md p-3 border border-slate-200">
+                <p className="text-xs text-slate-500">{item.label}</p>
+                <p className="font-semibold text-slate-900">{item.best || 'N/A'}</p>
               </div>
             ))}
           </div>
@@ -422,9 +422,9 @@ export default function ComparePage() {
                 <span className="font-bold text-sm">{m.summary.model_type.toUpperCase()}</span>
                 <Link
                   href={`/summaries/${m.summary.id}`}
-                  className="text-xs text-primary-600 hover:underline"
+                  className="text-xs text-blue-700 hover:underline"
                 >
-                  Full Details →
+                  Full details
                 </Link>
               </div>
               <p className="text-sm text-gray-700 leading-relaxed">

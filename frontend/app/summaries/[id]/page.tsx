@@ -101,9 +101,9 @@ export default function SummaryDetailPage() {
           <span className="font-medium text-gray-700">{label}</span>
           <span className="text-gray-600">{value.toFixed(4)}</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
+        <div className="w-full bg-slate-200 rounded-full h-2.5">
           <div
-            className="bg-primary-600 h-2.5 rounded-full transition-all duration-500"
+            className="bg-blue-700 h-2.5 rounded-full transition-all duration-500"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -114,7 +114,7 @@ export default function SummaryDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+        <Loader2 className="w-12 h-12 text-blue-700 animate-spin" />
       </div>
     )
   }
@@ -123,7 +123,7 @@ export default function SummaryDetailPage() {
     return (
       <div className="text-center py-12">
         <p className="text-red-600 text-lg">Summary not found</p>
-        <Link href="/" className="text-primary-600 hover:underline mt-2 inline-block">
+        <Link href="/" className="text-blue-700 hover:underline mt-2 inline-block">
           Go Home
         </Link>
       </div>
@@ -135,7 +135,7 @@ export default function SummaryDetailPage() {
       {/* Back */}
       <Link
         href={`/documents/${summary.document_id}`}
-        className="inline-flex items-center space-x-2 text-primary-600 hover:text-primary-700"
+        className="inline-flex items-center space-x-2 text-blue-700 hover:text-blue-800"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Back to Document</span>
@@ -193,7 +193,7 @@ export default function SummaryDetailPage() {
             <button
               onClick={runEvaluation}
               disabled={evaluating}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm inline-flex items-center space-x-2"
+              className="btn-primary text-sm inline-flex items-center space-x-2 disabled:opacity-50"
             >
               {evaluating ? (
                 <>
@@ -238,10 +238,10 @@ export default function SummaryDetailPage() {
             </div>
           </div>
         ) : (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No evaluation metrics yet.</p>
-            <p className="text-gray-400 text-sm mt-1">
+          <div className="text-center py-8 bg-slate-50 rounded-lg">
+            <BarChart3 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500">No evaluation metrics yet.</p>
+            <p className="text-slate-400 text-sm mt-1">
               Click &quot;Run Evaluation&quot; to compute ROUGE, BERTScore, and factuality metrics.
             </p>
           </div>
@@ -254,8 +254,7 @@ export default function SummaryDetailPage() {
           href={`/compare/${summary.document_id}`}
           className="btn-primary inline-flex items-center space-x-2"
         >
-          <span>Compare with Other Models</span>
-          <span>→</span>
+          <span>Compare with other models</span>
         </Link>
       </div>
     </div>
