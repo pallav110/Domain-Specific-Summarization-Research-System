@@ -1,176 +1,166 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Crimson_Pro, Source_Sans_3 } from 'next/font/google'
+import axios from 'axios'
 import DocumentUploader from '@/components/DocumentUploader'
 import DocumentList from '@/components/DocumentList'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   FileText,
   BarChart3,
   FlaskConical,
-  Scale,
-  Stethoscope,
-  UploadCloud
+  ArrowRight,
 } from 'lucide-react'
 
-const serif = Crimson_Pro({
-  subsets: ['latin'],
-  weight: ['400', '600', '700']
-})
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-const sans = Source_Sans_3({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700']
-})
+interface Stats {
+  total_documents: number
+  total_summaries: number
+  total_experiments: number
+}
 
 export default function Home() {
   const [uploadedDocId, setUploadedDocId] = useState<number | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const handleUploadSuccess = (docId: number) => {
-    setUploadedDocId(docId)
-  }
+  useEffect(() => {
+    axios
+      .get<Stats>(`${API_URL}/api/v1/dashboard/stats`)
+      .then((res) => setStats(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
   return (
-    <div className={`${sans.className} space-y-10`}>
-        {/* Hero Section */}
-        <section className="rounded-2xl border border-slate-200 bg-white">
-          <div className="grid gap-10 px-8 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-10">
-            <div className="space-y-6">
-              <h1 className={`${serif.className} text-4xl font-semibold leading-tight text-slate-900 md:text-5xl`}>
-                Domain-Specific Summarization Research
-              </h1>
-              <p className="text-base text-slate-600 md:text-lg">
-                A structured environment for comparing generic and domain-specific models on legal
-                and medical documents with clear, measurable outcomes.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/documents"
-                  className="btn-primary"
-                >
-                  Upload Documents
-                </Link>
-                <Link
-                  href="/experiments"
-                  className="btn-secondary"
-                >
-                  Run Experiments
-                </Link>
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <h3 className={`${serif.className} text-lg font-semibold text-slate-900`}>Research Snapshot</h3>
-              <div className="mt-5 space-y-4 text-sm text-slate-600">
-                <div className="flex items-start gap-3">
-                  <Scale className="h-5 w-5 text-blue-700" />
-                  Compare BART, PEGASUS, Gemini, Legal-BERT+PEGASUS, and Clinical-BERT+PEGASUS.
-                </div>
-                <div className="flex items-start gap-3">
-                  <Stethoscope className="h-5 w-5 text-blue-700" />
-                  Track fidelity with ROUGE, BERTScore, factuality, and semantic similarity.
-                </div>
-                <div className="flex items-start gap-3">
-                  <FlaskConical className="h-5 w-5 text-blue-700" />
-                  Export CSV/JSON for external analysis and reporting.
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+    <div className="flex h-[calc(100dvh-64px)] flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2">
+        <h1 className="text-lg font-semibold">Home</h1>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild title="View all documents">
+            <Link href="/documents">
+              <FileText className="mr-1.5 h-3.5 w-3.5" />
+              Documents
+            </Link>
+          </Button>
+          <Button asChild title="Run a new experiment">
+            <Link href="/experiments">
+              <FlaskConical className="mr-1.5 h-3.5 w-3.5" />
+              New Experiment
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-        {/* Quick Links */}
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <Link href="/documents" className="card transition-shadow hover:border-slate-300">
-            <div className="flex items-center gap-4">
-              <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
-                <FileText className="h-8 w-8" />
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-5xl space-y-6 px-4 py-4">
+          {/* Quick Links */}
+          <div className="grid grid-cols-3 gap-2">
+            <Link
+              href="/documents"
+              className="group flex items-center gap-3 rounded-md border bg-background px-3 py-2.5 transition-colors hover:bg-muted/50"
+              title="Upload and manage documents"
+            >
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium">Documents</p>
+                <p className="text-[11px] text-muted-foreground">Upload & classify</p>
               </div>
-              <div>
-                <h3 className={`${serif.className} text-2xl font-semibold text-slate-900`}>Documents</h3>
-                <p className="text-slate-600">Upload and classify files</p>
+              <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </Link>
+            <Link
+              href="/experiments"
+              className="group flex items-center gap-3 rounded-md border bg-background px-3 py-2.5 transition-colors hover:bg-muted/50"
+              title="Create and run experiments"
+            >
+              <FlaskConical className="h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium">Experiments</p>
+                <p className="text-[11px] text-muted-foreground">Run comparisons</p>
               </div>
-            </div>
-          </Link>
-
-          <Link href="/experiments" className="card transition-shadow hover:border-slate-300">
-            <div className="flex items-center gap-4">
-              <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
-                <FlaskConical className="h-8 w-8" />
+              <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </Link>
+            <Link
+              href="/dashboard"
+              className="group flex items-center gap-3 rounded-md border bg-background px-3 py-2.5 transition-colors hover:bg-muted/50"
+              title="View analytics and metrics"
+            >
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium">Dashboard</p>
+                <p className="text-[11px] text-muted-foreground">Metrics & trends</p>
               </div>
-              <div>
-                <h3 className={`${serif.className} text-2xl font-semibold text-slate-900`}>Experiments</h3>
-                <p className="text-slate-600">Run structured comparisons</p>
-              </div>
-            </div>
-          </Link>
-
-          <Link href="/dashboard" className="card transition-shadow hover:border-slate-300">
-            <div className="flex items-center gap-4">
-              <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
-                <BarChart3 className="h-8 w-8" />
-              </div>
-              <div>
-                <h3 className={`${serif.className} text-2xl font-semibold text-slate-900`}>Dashboard</h3>
-                <p className="text-slate-600">Review metrics and trends</p>
-              </div>
-            </div>
-          </Link>
-        </section>
-
-        {/* Upload + Focus */}
-        <section className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <h2 className={`${serif.className} text-2xl font-semibold text-slate-900`}>Upload Document</h2>
-              <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                <UploadCloud className="h-4 w-4" />
-                PDF or TXT
-              </div>
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              Submit a legal or medical document and generate summaries across all models.
-            </p>
-            <div className="mt-6">
-              <DocumentUploader onUploadSuccess={handleUploadSuccess} />
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 className={`${serif.className} text-2xl font-semibold text-slate-900`}>Research Focus</h2>
-            <div className="mt-4 space-y-4 text-sm text-slate-700">
-              <div className="flex items-start gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-blue-700" />
-                Compare generic models (BART, PEGASUS) with domain-specific pipelines (Legal-BERT+PEGASUS, Clinical-BERT+PEGASUS).
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-blue-700" />
-                Evaluate summaries using ROUGE, BERTScore, factuality, semantic similarity, and compression rate.
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-blue-700" />
-                Use Gemini as an LLM baseline for quality and coverage.
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-blue-700" />
-                Export results for statistical analysis and publication-ready tables.
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Recent Documents */}
-        <section className="card">
-          <div className="flex items-center justify-between">
-            <h2 className={`${serif.className} text-2xl font-semibold text-slate-900`}>Recent Documents</h2>
-            <Link href="/documents" className="text-sm font-semibold text-blue-700 hover:text-blue-800">
-              View all
+              <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
             </Link>
           </div>
-          <div className="mt-6">
+
+          {/* Upload + Research Focus */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-xs font-medium uppercase text-muted-foreground">Upload Document</h2>
+                <span className="text-[11px] text-muted-foreground">PDF or TXT</span>
+              </div>
+              <DocumentUploader onUploadSuccess={(id) => setUploadedDocId(id)} />
+            </div>
+            <div>
+              <h2 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Research Focus</h2>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  <span>Compare BART, PEGASUS, Gemini, Legal-BERT+PEGASUS, Clinical-BERT+PEGASUS</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  <span>Evaluate with ROUGE, BERTScore, factuality, semantic similarity</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  <span>Gemini as LLM baseline for quality and coverage</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  <span>Export CSV/JSON for statistical analysis</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Documents */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-xs font-medium uppercase text-muted-foreground">Recent Documents</h2>
+              <Link href="/documents" className="text-[11px] font-medium text-primary hover:underline">
+                View all
+              </Link>
+            </div>
             <DocumentList limit={5} highlightId={uploadedDocId} />
           </div>
-        </section>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t bg-muted/30 px-4 py-2">
+        <div className="grid grid-cols-3 gap-4">
+          <div title="Total documents uploaded to the system">
+            <p className="text-[10px] font-medium uppercase text-muted-foreground">Documents</p>
+            {loading ? <Skeleton className="mt-1 h-4 w-8" /> : <p className="text-sm font-semibold">{stats?.total_documents ?? 0}</p>}
+          </div>
+          <div title="Total summaries generated across all models">
+            <p className="text-[10px] font-medium uppercase text-muted-foreground">Summaries</p>
+            {loading ? <Skeleton className="mt-1 h-4 w-8" /> : <p className="text-sm font-semibold">{stats?.total_summaries ?? 0}</p>}
+          </div>
+          <div title="Total experiments run comparing models">
+            <p className="text-[10px] font-medium uppercase text-muted-foreground">Experiments</p>
+            {loading ? <Skeleton className="mt-1 h-4 w-8" /> : <p className="text-sm font-semibold">{stats?.total_experiments ?? 0}</p>}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

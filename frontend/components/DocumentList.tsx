@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Link from 'next/link'
-import { FileText, Calendar, Hash, Loader2 } from 'lucide-react'
+import { FileText } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -25,112 +27,89 @@ interface Props {
   highlightId?: number | null
 }
 
+const domainDot: Record<string, string> = {
+  legal: 'bg-sky-500',
+  medical: 'bg-emerald-500',
+}
+
 export default function DocumentList({ limit, highlightId }: Props) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchDocuments()
+    const params = limit ? { limit } : {}
+    axios
+      .get<Document[]>(`${API_URL}/api/v1/documents`, { params })
+      .then((res) => setDocuments(res.data))
+      .catch((err) => setError(err.response?.data?.detail || 'Failed to load'))
+      .finally(() => setLoading(false))
   }, [limit])
-
-  const fetchDocuments = async () => {
-    try {
-      const params = limit ? { limit } : {}
-      const response = await axios.get<Document[]>(
-        `${API_URL}/api/v1/documents`,
-        { params }
-      )
-      setDocuments(response.data)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load documents')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <Loader2 className="w-8 h-8 text-blue-700 animate-spin" />
+      <div className="space-y-1">
+        {Array.from({ length: limit || 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-2 py-2">
+            <Skeleton className="h-3.5 w-3.5 rounded" />
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="ml-auto h-3 w-16" />
+          </div>
+        ))}
       </div>
     )
   }
 
   if (error) {
-    return (
-      <div className="text-center py-12 text-red-600">
-        <p>{error}</p>
-      </div>
-    )
+    return <p className="py-4 text-center text-xs text-destructive">{error}</p>
   }
 
   if (documents.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-        <p>No documents uploaded yet</p>
+      <div className="py-8 text-center">
+        <FileText className="mx-auto h-8 w-8 text-muted-foreground/50" />
+        <p className="mt-2 text-xs text-muted-foreground">No documents uploaded yet</p>
       </div>
     )
   }
 
-  const getDomainColor = (domain: string) => {
-    switch (domain.toLowerCase()) {
-      case 'legal':
-        return 'bg-blue-100 text-blue-800'
-      case 'medical':
-        return 'bg-green-100 text-green-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
   return (
-    <div className="space-y-3">
-      {documents.map((doc) => (
-        <Link
-          key={doc.id}
-          href={`/documents/${doc.id}`}
-          className={`block p-4 rounded-md border transition-all hover:border-slate-300 ${
-            highlightId === doc.id
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-slate-200'
-          }`}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3 flex-1">
-              <FileText className="w-5 h-5 text-gray-400 mt-1 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-gray-900 truncate">
+    <div className="overflow-hidden rounded-md border">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b bg-muted/30">
+            <th className="px-3 py-1.5 text-left text-[11px] font-medium uppercase text-muted-foreground">Name</th>
+            <th className="px-3 py-1.5 text-left text-[11px] font-medium uppercase text-muted-foreground" title="Detected document domain">Domain</th>
+            <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="Word count of original document">Words</th>
+            <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {documents.map((doc) => (
+            <tr
+              key={doc.id}
+              className={cn(
+                'cursor-pointer transition-colors hover:bg-muted/50',
+                highlightId === doc.id && 'bg-primary/5'
+              )}
+            >
+              <td className="px-3 py-1.5">
+                <Link href={`/documents/${doc.id}`} className="block text-xs font-medium truncate max-w-[200px]">
                   {doc.original_filename}
-                </h3>
-                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
-                  <span className="flex items-center space-x-1">
-                    <Hash className="w-4 h-4" />
-                    <span>{doc.word_count.toLocaleString()} words</span>
-                  </span>
-                  <span className="flex items-center space-x-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{new Date(doc.upload_timestamp).toLocaleDateString()}</span>
-                  </span>
+                </Link>
+              </td>
+              <td className="px-3 py-1.5">
+                <div className="flex items-center gap-1.5">
+                  <div className={cn('h-1.5 w-1.5 rounded-full', domainDot[doc.detected_domain?.toLowerCase()] || 'bg-muted-foreground')} />
+                  <span className="text-xs text-muted-foreground">{doc.detected_domain || 'unknown'}</span>
                 </div>
-              </div>
-            </div>
-            <div className="ml-4 flex flex-col items-end space-y-2">
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDomainColor(
-                  doc.detected_domain
-                )}`}
-              >
-                {doc.detected_domain.toUpperCase()}
-              </span>
-              <span className="text-xs text-gray-500">
-                {(doc.domain_confidence * 100).toFixed(0)}% confidence
-              </span>
-            </div>
-          </div>
-        </Link>
-      ))}
+              </td>
+              <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">{doc.word_count.toLocaleString()}</td>
+              <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">{new Date(doc.upload_timestamp).toLocaleDateString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

@@ -2,75 +2,51 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import {
-  FileText,
-  FlaskConical,
-  BarChart3,
-  Home,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react'
+import { FileText, FlaskConical, BarChart3, Home, TrendingUp, Table2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+const navItems = [
+  { href: '/', label: 'Home', icon: Home },
+  { href: '/documents', label: 'Documents', icon: FileText },
+  { href: '/experiments', label: 'Experiments', icon: FlaskConical },
+  { href: '/results', label: 'Results', icon: Table2 },
+  { href: '/statistics', label: 'Statistics', icon: TrendingUp },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+]
 
 export default function Navigation() {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
-
-  const navItems = [
-    { href: '/', label: 'Home', icon: Home },
-    { href: '/documents', label: 'Documents', icon: FileText },
-    { href: '/experiments', label: 'Experiments', icon: FlaskConical },
-    { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-  ]
 
   return (
-    <aside
-      className={`sticky top-0 hidden h-screen shrink-0 border-r border-slate-200 bg-white shadow-sm md:flex md:flex-col ${
-        collapsed ? 'w-20' : 'w-64'
-      }`}
-    >
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="rounded-lg bg-blue-700 p-2">
-            <FileText className="h-5 w-5 text-white" />
-          </div>
-          {!collapsed && (
-            <span className="text-sm font-semibold text-slate-900">
-              Research Summarization
-            </span>
-          )}
-        </Link>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="rounded-md border border-slate-200 p-1 text-slate-500 hover:text-slate-700"
-          aria-label="Toggle sidebar"
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
-      </div>
-
-      <nav className="flex-1 px-3 py-4">
-        <div className="space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {!collapsed && <span>{label}</span>}
-              </Link>
-            )
-          })}
+    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center border-b bg-background px-4">
+      <Link href="/" className="mr-8 flex items-center gap-2" title="Home">
+        <div className="rounded-md bg-primary p-1.5">
+          <FileText className="h-4 w-4 text-primary-foreground" />
         </div>
-      </nav>
+        <span className="text-sm font-semibold">SumResearch</span>
+      </Link>
 
-    </aside>
+      <nav className="flex items-center gap-1">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href || (href !== '/' && pathname.startsWith(href))
+          return (
+            <Link
+              key={href}
+              href={href}
+              title={label}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+    </header>
   )
 }

@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import axios from 'axios'
 import Link from 'next/link'
-import {
-  Loader2, ArrowLeft, BarChart3, Trophy, Clock, Hash, AlertTriangle
-} from 'lucide-react'
+import { Loader2, ArrowLeft, BarChart3, Trophy, AlertTriangle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis,
@@ -15,423 +16,333 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-interface Summary {
-  id: number
-  document_id: number
+interface ModelComparison {
   model_type: string
   model_name: string
-  summary_text: string
+  summary_id: number
   summary_length: number
   generation_time: number
-  created_at: string
-}
-
-interface Document {
-  id: number
-  original_filename: string
-  word_count: number
-  detected_domain: string
-  domain_confidence: number
-  raw_text: string
-}
-
-interface Evaluation {
-  id: number
-  summary_id: number
+  summary_text: string
   rouge_1_f: number | null
   rouge_2_f: number | null
   rouge_l_f: number | null
+  rouge_1_p: number | null
+  rouge_1_r: number | null
+  rouge_l_p: number | null
+  rouge_l_r: number | null
   bertscore_f1: number | null
+  bertscore_precision: number | null
+  bertscore_recall: number | null
   factuality_score: number | null
-  compression_ratio: number | null
   semantic_similarity: number | null
+  compression_ratio: number | null
 }
 
-interface ModelData {
-  summary: Summary
-  evaluation: Evaluation | null
+interface ComparisonResponse {
+  document_id: number
+  document_name: string
+  domain: string
+  word_count: number
+  models: ModelComparison[]
+  best_model: string
+  recommendations: string[]
 }
+
+// Fallback types for manual fetching
+interface Summary { id: number; document_id: number; model_type: string; model_name: string; summary_text: string; summary_length: number; generation_time: number; created_at: string }
+interface Document { id: number; original_filename: string; word_count: number; detected_domain: string; domain_confidence: number }
+interface Evaluation { rouge_1_f: number | null; rouge_2_f: number | null; rouge_l_f: number | null; rouge_1_p?: number | null; rouge_1_r?: number | null; rouge_l_p?: number | null; rouge_l_r?: number | null; bertscore_f1: number | null; bertscore_precision?: number | null; bertscore_recall?: number | null; factuality_score: number | null; semantic_similarity: number | null; compression_ratio: number | null }
 
 const MODEL_COLORS: Record<string, string> = {
-  bart: '#f97316',
-  pegasus: '#8b5cf6',
-  gemini: '#3b82f6',
-  gpt: '#10b981',
-  t5: '#ef4444',
-  legal_bert_pegasus: '#06b6d4',
-  clinical_bert_pegasus: '#ec4899',
+  bart: '#f97316', pegasus: '#8b5cf6', gemini: '#3b82f6', gpt: '#10b981',
+  t5: '#ef4444', legal_bert_pegasus: '#06b6d4', clinical_bert_pegasus: '#ec4899',
 }
 
 export default function ComparePage() {
   const params = useParams()
   const documentId = params.id as string
 
-  const [document, setDocument] = useState<Document | null>(null)
-  const [models, setModels] = useState<ModelData[]>([])
+  const [comparison, setComparison] = useState<ComparisonResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [evaluatingAll, setEvaluatingAll] = useState(false)
+  const [showPR, setShowPR] = useState(false)
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Try the compare API first
+        const res = await axios.get<ComparisonResponse>(`${API_URL}/api/v1/compare/${documentId}`)
+        setComparison(res.data)
+      } catch {
+        // Fallback: manually assemble from individual endpoints
+        try {
+          const [docRes, sumRes] = await Promise.all([
+            axios.get<Document>(`${API_URL}/api/v1/documents/${documentId}`),
+            axios.get<Summary[]>(`${API_URL}/api/v1/documents/${documentId}/summaries`),
+          ])
+          const models: ModelComparison[] = await Promise.all(
+            sumRes.data.map(async (s) => {
+              let ev: Evaluation = {} as Evaluation
+              try { const r = await axios.get(`${API_URL}/api/v1/evaluations/summary/${s.id}`); ev = r.data } catch {}
+              return {
+                model_type: s.model_type, model_name: s.model_name, summary_id: s.id,
+                summary_length: s.summary_length, generation_time: s.generation_time, summary_text: s.summary_text,
+                rouge_1_f: ev.rouge_1_f ?? null, rouge_2_f: ev.rouge_2_f ?? null, rouge_l_f: ev.rouge_l_f ?? null,
+                rouge_1_p: ev.rouge_1_p ?? null, rouge_1_r: ev.rouge_1_r ?? null,
+                rouge_l_p: ev.rouge_l_p ?? null, rouge_l_r: ev.rouge_l_r ?? null,
+                bertscore_f1: ev.bertscore_f1 ?? null, bertscore_precision: ev.bertscore_precision ?? null, bertscore_recall: ev.bertscore_recall ?? null,
+                factuality_score: ev.factuality_score ?? null, semantic_similarity: ev.semantic_similarity ?? null,
+                compression_ratio: ev.compression_ratio ?? null,
+              }
+            })
+          )
+          setComparison({
+            document_id: docRes.data.id, document_name: docRes.data.original_filename,
+            domain: docRes.data.detected_domain, word_count: docRes.data.word_count,
+            models, best_model: '', recommendations: [],
+          })
+        } catch {}
+      }
+      setLoading(false)
+    }
     fetchData()
   }, [documentId])
 
-  const fetchData = async () => {
-    try {
-      const [docRes, sumRes] = await Promise.all([
-        axios.get<Document>(`${API_URL}/api/v1/documents/${documentId}`),
-        axios.get<Summary[]>(`${API_URL}/api/v1/documents/${documentId}/summaries`),
-      ])
-      setDocument(docRes.data)
-
-      // Try to fetch evaluations for each summary
-      const modelData: ModelData[] = await Promise.all(
-        sumRes.data.map(async (summary) => {
-          let evaluation: Evaluation | null = null
-          try {
-            const evalRes = await axios.get<Evaluation>(
-              `${API_URL}/api/v1/evaluations/summary/${summary.id}`
-            )
-            evaluation = evalRes.data
-          } catch {
-            // No evaluation yet
-          }
-          return { summary, evaluation }
-        })
-      )
-      setModels(modelData)
-    } catch (err) {
-      console.error('Error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const evaluateAll = async () => {
+    if (!comparison) return
     setEvaluatingAll(true)
     try {
-      const updated = await Promise.all(
-        models.map(async (m) => {
-          if (m.evaluation) return m
-          try {
-            const res = await axios.post<Evaluation>(
-              `${API_URL}/api/v1/evaluate/${m.summary.id}`
-            )
-            return { ...m, evaluation: res.data }
-          } catch {
-            return m
-          }
-        })
-      )
-      setModels(updated)
-    } catch (err) {
-      console.error('Evaluation failed:', err)
-    } finally {
-      setEvaluatingAll(false)
-    }
+      for (const m of comparison.models) {
+        if (m.rouge_l_f !== null) continue
+        try { await axios.post(`${API_URL}/api/v1/evaluate/${m.summary_id}`) } catch {}
+      }
+      // Refresh
+      const res = await axios.get<ComparisonResponse>(`${API_URL}/api/v1/compare/${documentId}`)
+      setComparison(res.data)
+    } catch {}
+    setEvaluatingAll(false)
   }
 
   const getModelColor = (model: string) => MODEL_COLORS[model?.toLowerCase()] || '#6b7280'
+  const fmt = (v: number | null) => v !== null && v !== undefined ? v.toFixed(4) : '—'
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-96">
-        <Loader2 className="w-12 h-12 text-blue-700 animate-spin" />
+      <div className="flex h-[calc(100dvh-64px)] flex-col">
+        <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-2"><Skeleton className="h-5 w-48" /></div>
+        <div className="flex-1 space-y-4 px-4 py-4">
+          <div className="grid grid-cols-3 gap-2">{[1,2,3].map(i=><Skeleton key={i} className="h-16"/>)}</div>
+          <div className="grid grid-cols-2 gap-4"><Skeleton className="h-48"/><Skeleton className="h-48"/></div>
+        </div>
       </div>
     )
   }
 
-  if (!document || models.length === 0) {
+  if (!comparison || comparison.models.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600 text-lg">No summaries found for this document.</p>
-        <Link href={`/documents/${documentId}`} className="text-blue-700 hover:underline mt-2 inline-block">
-          Go back and generate summaries
-        </Link>
+      <div className="flex h-[calc(100dvh-64px)] flex-col items-center justify-center">
+        <p className="text-sm text-destructive">No summaries found for this document.</p>
+        <Link href={`/documents/${documentId}`} className="mt-2 text-xs text-primary hover:underline">Generate summaries first</Link>
       </div>
     )
   }
 
-  // Prepare chart data
-  const hasEvals = models.some(m => m.evaluation)
+  const { models } = comparison
+  const hasEvals = models.some(m => m.rouge_l_f !== null)
 
-  const lengthData = models.map(m => ({
-    model: m.summary.model_type.toUpperCase(),
-    words: m.summary.summary_length,
-    time: parseFloat(m.summary.generation_time?.toFixed(2) || '0'),
-    fill: getModelColor(m.summary.model_type),
-  }))
+  const lengthData = models.map(m => ({ model: m.model_type.toUpperCase(), words: m.summary_length, time: parseFloat(m.generation_time?.toFixed(2) || '0') }))
 
-  const compressionData = models.map(m => ({
-    model: m.summary.model_type.toUpperCase(),
-    ratio: document.word_count > 0
-      ? parseFloat(((1 - m.summary.summary_length / document.word_count) * 100).toFixed(1))
-      : 0,
-    fill: getModelColor(m.summary.model_type),
-  }))
+  const rougeData = hasEvals ? [
+    { metric: 'ROUGE-1', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), m.rouge_1_f ?? 0])) },
+    { metric: 'ROUGE-2', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), m.rouge_2_f ?? 0])) },
+    { metric: 'ROUGE-L', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), m.rouge_l_f ?? 0])) },
+  ] : []
 
-  const rougeData = hasEvals
-    ? [
-        {
-          metric: 'ROUGE-1',
-          ...Object.fromEntries(models.map(m => [
-            m.summary.model_type.toUpperCase(),
-            m.evaluation?.rouge_1_f ?? 0,
-          ])),
-        },
-        {
-          metric: 'ROUGE-2',
-          ...Object.fromEntries(models.map(m => [
-            m.summary.model_type.toUpperCase(),
-            m.evaluation?.rouge_2_f ?? 0,
-          ])),
-        },
-        {
-          metric: 'ROUGE-L',
-          ...Object.fromEntries(models.map(m => [
-            m.summary.model_type.toUpperCase(),
-            m.evaluation?.rouge_l_f ?? 0,
-          ])),
-        },
-      ]
-    : []
+  const radarData = hasEvals ? [
+    { metric: 'ROUGE-1', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), (m.rouge_1_f ?? 0) * 100])) },
+    { metric: 'ROUGE-2', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), (m.rouge_2_f ?? 0) * 100])) },
+    { metric: 'ROUGE-L', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), (m.rouge_l_f ?? 0) * 100])) },
+    { metric: 'BERTScore', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), (m.bertscore_f1 ?? 0) * 100])) },
+    { metric: 'Factuality', ...Object.fromEntries(models.map(m => [m.model_type.toUpperCase(), (m.factuality_score ?? 0) * 100])) },
+  ] : []
 
-  const radarData = hasEvals
-    ? [
-        { metric: 'ROUGE-1', ...Object.fromEntries(models.map(m => [m.summary.model_type.toUpperCase(), (m.evaluation?.rouge_1_f ?? 0) * 100])) },
-        { metric: 'ROUGE-2', ...Object.fromEntries(models.map(m => [m.summary.model_type.toUpperCase(), (m.evaluation?.rouge_2_f ?? 0) * 100])) },
-        { metric: 'ROUGE-L', ...Object.fromEntries(models.map(m => [m.summary.model_type.toUpperCase(), (m.evaluation?.rouge_l_f ?? 0) * 100])) },
-        { metric: 'BERTScore', ...Object.fromEntries(models.map(m => [m.summary.model_type.toUpperCase(), (m.evaluation?.bertscore_f1 ?? 0) * 100])) },
-        { metric: 'Factuality', ...Object.fromEntries(models.map(m => [m.summary.model_type.toUpperCase(), (m.evaluation?.factuality_score ?? 0) * 100])) },
-      ]
-    : []
-
-  // Find best model per metric
-  const findBest = (getter: (e: Evaluation) => number | null) => {
-    let best: ModelData | null = null
-    let bestVal = -1
-    for (const m of models) {
-      const v = m.evaluation ? getter(m.evaluation) : null
-      if (v !== null && v > bestVal) {
-        bestVal = v
-        best = m
-      }
-    }
-    return best?.summary.model_type.toUpperCase()
-  }
+  const weightedScore = (m: ModelComparison) => (m.rouge_l_f ?? 0) * 0.3 + (m.bertscore_f1 ?? 0) * 0.3 + (m.semantic_similarity ?? 0) * 0.2 + (m.factuality_score ?? 0) * 0.2
 
   return (
-    <div className="space-y-6">
-      <Link
-        href={`/documents/${documentId}`}
-        className="inline-flex items-center space-x-2 text-blue-700 hover:text-blue-800"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Back to Document</span>
-      </Link>
-
+    <div className="flex h-[calc(100dvh-64px)] flex-col">
       {/* Header */}
-      <div className="card">
-        <div className="flex items-center space-x-3 mb-2">
-          <Trophy className="w-8 h-8 text-blue-700" />
-          <h1 className="text-3xl font-semibold text-slate-900">Model Comparison</h1>
+      <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" asChild title="Back to document">
+            <Link href={`/documents/${documentId}`}><ArrowLeft className="h-3.5 w-3.5" /></Link>
+          </Button>
+          <h1 className="text-lg font-semibold">Model Comparison</h1>
+          <span className="text-xs text-muted-foreground">{comparison.document_name} &middot; {models.length} models</span>
+          {comparison.best_model && (
+            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700" title="Best overall model determined by the backend">
+              Best: {comparison.best_model.toUpperCase()}
+            </span>
+          )}
         </div>
-        <p className="text-slate-600">
-          Comparing {models.length} models on{' '}
-          <span className="font-semibold">{document.original_filename}</span>
-          {' '}({document.word_count} words, {document.detected_domain.toUpperCase()} domain)
-        </p>
+        <div className="flex items-center gap-2">
+          {hasEvals && (
+            <button
+              onClick={() => setShowPR(!showPR)}
+              className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors', showPR ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent')}
+              title="Toggle Precision/Recall columns"
+            >
+              {showPR ? 'Hide P/R' : 'Show P/R'}
+            </button>
+          )}
+          {!hasEvals && (
+            <Button onClick={evaluateAll} disabled={evaluatingAll} title="Run evaluation metrics for all models">
+              {evaluatingAll ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Evaluating...</> : <><BarChart3 className="mr-1.5 h-3.5 w-3.5" />Evaluate All</>}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Quick Stats + Evaluate All */}
-      <div className="flex flex-wrap gap-4 items-center">
-        {models.map(m => (
-          <div key={m.summary.id} className="card flex-1 min-w-[200px]" style={{ borderTop: `4px solid ${getModelColor(m.summary.model_type)}` }}>
-            <h3 className="font-bold text-lg">{m.summary.model_type.toUpperCase()}</h3>
-            <div className="text-sm text-gray-500 space-y-1 mt-2">
-              <div className="flex items-center space-x-1">
-                <Hash className="w-3 h-3" />
-                <span>{m.summary.summary_length} words</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Clock className="w-3 h-3" />
-                <span>{m.summary.generation_time?.toFixed(2)}s</span>
-              </div>
-              <div>
-                Compression: {((1 - m.summary.summary_length / document.word_count) * 100).toFixed(0)}%
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {!hasEvals && (
-        <div className="card bg-slate-50">
-          <div className="flex items-start space-x-3">
-            <AlertTriangle className="w-5 h-5 text-slate-500 mt-0.5" />
-            <div>
-              <p className="font-medium text-slate-800">No evaluation metrics computed yet</p>
-              <p className="text-sm text-slate-600 mt-1">
-                Run evaluation to see ROUGE, BERTScore, and factuality comparisons.
-              </p>
-              <button
-                onClick={evaluateAll}
-                disabled={evaluatingAll}
-                className="mt-3 btn-primary text-sm inline-flex items-center space-x-2 disabled:opacity-50"
-              >
-                {evaluatingAll ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /><span>Evaluating All...</span></>
-                ) : (
-                  <><BarChart3 className="w-4 h-4" /><span>Evaluate All Models</span></>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Word Count Comparison */}
-        <div className="card">
-          <h2 className="text-lg font-bold mb-4 text-gray-800">Summary Length (words)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={lengthData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="model" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="words" fill="#3b82f6">
-                {lengthData.map((entry, i) => (
-                  <Bar key={i} dataKey="words" fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Generation Time */}
-        <div className="card">
-          <h2 className="text-lg font-bold mb-4 text-gray-800">Generation Time (seconds)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={lengthData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="model" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="time" fill="#10b981" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Compression Ratio */}
-        <div className="card">
-          <h2 className="text-lg font-bold mb-4 text-gray-800">Compression Rate (%)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={compressionData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="model" />
-              <YAxis domain={[0, 100]} />
-              <Tooltip formatter={(v: number) => `${v}%`} />
-              <Bar dataKey="ratio" fill="#8b5cf6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* ROUGE Scores */}
-        {hasEvals && rougeData.length > 0 && (
-          <div className="card">
-            <h2 className="text-lg font-bold mb-4 text-gray-800">ROUGE Scores</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={rougeData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="metric" />
-                <YAxis domain={[0, 1]} />
-                <Tooltip formatter={(v: number) => v.toFixed(4)} />
-                <Legend />
-                {models.map(m => (
-                  <Bar
-                    key={m.summary.model_type}
-                    dataKey={m.summary.model_type.toUpperCase()}
-                    fill={getModelColor(m.summary.model_type)}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      {/* Radar Chart */}
-      {hasEvals && radarData.length > 0 && (
-        <div className="card">
-          <h2 className="text-lg font-bold mb-4 text-gray-800">Multi-Metric Radar</h2>
-          <ResponsiveContainer width="100%" height={400}>
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-              <PolarGrid />
-              <PolarAngleAxis dataKey="metric" />
-              <PolarRadiusAxis angle={30} domain={[0, 100]} />
-              {models.map(m => (
-                <Radar
-                  key={m.summary.model_type}
-                  name={m.summary.model_type.toUpperCase()}
-                  dataKey={m.summary.model_type.toUpperCase()}
-                  stroke={getModelColor(m.summary.model_type)}
-                  fill={getModelColor(m.summary.model_type)}
-                  fillOpacity={0.15}
-                />
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="mx-auto max-w-6xl space-y-6">
+          {/* Recommendations */}
+          {comparison.recommendations && comparison.recommendations.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+              <h3 className="text-[11px] font-medium uppercase text-amber-700">Domain Recommendations</h3>
+              {comparison.recommendations.map((r, i) => (
+                <p key={i} className="mt-0.5 text-xs text-amber-800">{r}</p>
               ))}
-              <Legend />
-              <Tooltip />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* Best Model Summary */}
-      {hasEvals && (
-        <div className="card bg-slate-50">
-          <h2 className="text-lg font-semibold mb-3 text-slate-900 flex items-center space-x-2">
-            <Trophy className="w-5 h-5 text-blue-700" />
-            <span>Best Model by Metric</span>
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {[
-              { label: 'ROUGE-1', best: findBest(e => e.rouge_1_f) },
-              { label: 'ROUGE-2', best: findBest(e => e.rouge_2_f) },
-              { label: 'ROUGE-L', best: findBest(e => e.rouge_l_f) },
-              { label: 'BERTScore', best: findBest(e => e.bertscore_f1) },
-              { label: 'Factuality', best: findBest(e => e.factuality_score) },
-              { label: 'Semantic Sim.', best: findBest(e => e.semantic_similarity) },
-            ].map(item => (
-              <div key={item.label} className="bg-white rounded-md p-3 border border-slate-200">
-                <p className="text-xs text-slate-500">{item.label}</p>
-                <p className="font-semibold text-slate-900">{item.best || 'N/A'}</p>
+          {/* Full Metrics Table */}
+          {hasEvals && (
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="sticky left-0 bg-muted/30 px-3 py-1.5 text-left text-[11px] font-medium uppercase text-muted-foreground">Model</th>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="ROUGE-1 F1">R-1</th>
+                    {showPR && <th className="px-2 py-1.5 text-right text-[10px] font-medium uppercase text-muted-foreground" title="ROUGE-1 Precision">R1-P</th>}
+                    {showPR && <th className="px-2 py-1.5 text-right text-[10px] font-medium uppercase text-muted-foreground" title="ROUGE-1 Recall">R1-R</th>}
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="ROUGE-2 F1">R-2</th>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="ROUGE-L F1">R-L</th>
+                    {showPR && <th className="px-2 py-1.5 text-right text-[10px] font-medium uppercase text-muted-foreground" title="ROUGE-L Precision">RL-P</th>}
+                    {showPR && <th className="px-2 py-1.5 text-right text-[10px] font-medium uppercase text-muted-foreground" title="ROUGE-L Recall">RL-R</th>}
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="BERTScore F1">BERT</th>
+                    {showPR && <th className="px-2 py-1.5 text-right text-[10px] font-medium uppercase text-muted-foreground" title="BERTScore Precision">B-P</th>}
+                    {showPR && <th className="px-2 py-1.5 text-right text-[10px] font-medium uppercase text-muted-foreground" title="BERTScore Recall">B-R</th>}
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="Factuality score">Fact.</th>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="Semantic similarity">Sem.</th>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="Words in summary">Words</th>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="Generation time (seconds)">Time</th>
+                    <th className="px-3 py-1.5 text-right text-[11px] font-medium uppercase text-muted-foreground" title="Weighted score: 30% R-L + 30% BERT + 20% Sem + 20% Fact">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...models].sort((a, b) => weightedScore(b) - weightedScore(a)).map((m) => (
+                    <tr key={m.summary_id} className={cn('border-b border-transparent hover:bg-muted/50', comparison.best_model === m.model_type && 'bg-amber-50/50')}>
+                      <td className="sticky left-0 bg-background px-3 py-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2 w-2 rounded-full" style={{ backgroundColor: getModelColor(m.model_type) }} />
+                          <span className="text-xs font-semibold">{m.model_type.toUpperCase()}</span>
+                          {comparison.best_model === m.model_type && <Trophy className="h-3 w-3 text-amber-500" />}
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-xs">{fmt(m.rouge_1_f)}</td>
+                      {showPR && <td className="px-2 py-1.5 text-right text-[10px] text-muted-foreground">{fmt(m.rouge_1_p)}</td>}
+                      {showPR && <td className="px-2 py-1.5 text-right text-[10px] text-muted-foreground">{fmt(m.rouge_1_r)}</td>}
+                      <td className="px-3 py-1.5 text-right text-xs">{fmt(m.rouge_2_f)}</td>
+                      <td className="px-3 py-1.5 text-right text-xs">{fmt(m.rouge_l_f)}</td>
+                      {showPR && <td className="px-2 py-1.5 text-right text-[10px] text-muted-foreground">{fmt(m.rouge_l_p)}</td>}
+                      {showPR && <td className="px-2 py-1.5 text-right text-[10px] text-muted-foreground">{fmt(m.rouge_l_r)}</td>}
+                      <td className="px-3 py-1.5 text-right text-xs">{fmt(m.bertscore_f1)}</td>
+                      {showPR && <td className="px-2 py-1.5 text-right text-[10px] text-muted-foreground">{fmt(m.bertscore_precision)}</td>}
+                      {showPR && <td className="px-2 py-1.5 text-right text-[10px] text-muted-foreground">{fmt(m.bertscore_recall)}</td>}
+                      <td className="px-3 py-1.5 text-right text-xs">{fmt(m.factuality_score)}</td>
+                      <td className="px-3 py-1.5 text-right text-xs">{fmt(m.semantic_similarity)}</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">{m.summary_length}</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">{m.generation_time?.toFixed(2)}s</td>
+                      <td className="px-3 py-1.5 text-right text-xs font-semibold">{weightedScore(m).toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!hasEvals && (
+            <div className="rounded-md border bg-muted/20 px-4 py-6 text-center">
+              <AlertTriangle className="mx-auto h-6 w-6 text-muted-foreground" />
+              <p className="mt-2 text-xs font-medium text-muted-foreground">No evaluation metrics computed yet</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Click &quot;Evaluate All&quot; to run ROUGE, BERTScore, and factuality.</p>
+            </div>
+          )}
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-md border px-3 py-2">
+              <h3 className="mb-2 text-[11px] font-medium uppercase text-muted-foreground" title="Number of words in each generated summary">Summary Length</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={lengthData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="model" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip contentStyle={{fontSize:11}}/><Bar dataKey="words" fill="#3b82f6"/></BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="rounded-md border px-3 py-2">
+              <h3 className="mb-2 text-[11px] font-medium uppercase text-muted-foreground" title="Time to generate each summary">Generation Time (s)</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={lengthData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="model" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip contentStyle={{fontSize:11}}/><Bar dataKey="time" fill="#10b981"/></BarChart>
+              </ResponsiveContainer>
+            </div>
+            {hasEvals && rougeData.length > 0 && (
+              <div className="rounded-md border px-3 py-2">
+                <h3 className="mb-2 text-[11px] font-medium uppercase text-muted-foreground" title="ROUGE F1 scores across models">ROUGE Scores</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={rougeData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="metric" tick={{fontSize:10}}/><YAxis domain={[0,1]} tick={{fontSize:10}}/><Tooltip contentStyle={{fontSize:11}} formatter={(v:number)=>v.toFixed(4)}/><Legend wrapperStyle={{fontSize:10}}/>
+                    {models.map(m=><Bar key={m.model_type} dataKey={m.model_type.toUpperCase()} fill={getModelColor(m.model_type)}/>)}
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            ))}
+            )}
+            {hasEvals && radarData.length > 0 && (
+              <div className="rounded-md border px-3 py-2">
+                <h3 className="mb-2 text-[11px] font-medium uppercase text-muted-foreground" title="Multi-metric radar comparison">Radar</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                    <PolarGrid/><PolarAngleAxis dataKey="metric" tick={{fontSize:9}}/><PolarRadiusAxis angle={30} domain={[0,100]} tick={{fontSize:8}}/>
+                    {models.map(m=><Radar key={m.model_type} name={m.model_type.toUpperCase()} dataKey={m.model_type.toUpperCase()} stroke={getModelColor(m.model_type)} fill={getModelColor(m.model_type)} fillOpacity={0.15}/>)}
+                    <Legend wrapperStyle={{fontSize:10}}/><Tooltip contentStyle={{fontSize:11}}/>
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Side-by-Side Summaries */}
+          <div>
+            <h3 className="mb-2 text-[11px] font-medium uppercase text-muted-foreground">Summary Text</h3>
+            <div className="space-y-2">
+              {models.map((m) => (
+                <div key={m.summary_id} className="rounded-md border px-3 py-2" style={{ borderLeftWidth: '3px', borderLeftColor: getModelColor(m.model_type) }}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xs font-semibold">{m.model_type.toUpperCase()}</span>
+                    <Link href={`/summaries/${m.summary_id}`} className="text-[11px] text-primary hover:underline" title="View full summary details">Details</Link>
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{m.summary_text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Side-by-Side Summaries */}
-      <div className="card">
-        <h2 className="text-lg font-bold mb-4 text-gray-800">Side-by-Side Summary Text</h2>
-        <div className="space-y-4">
-          {models.map(m => (
-            <div key={m.summary.id} className="border rounded-lg p-4" style={{ borderLeftWidth: '4px', borderLeftColor: getModelColor(m.summary.model_type) }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-sm">{m.summary.model_type.toUpperCase()}</span>
-                <Link
-                  href={`/summaries/${m.summary.id}`}
-                  className="text-xs text-blue-700 hover:underline"
-                >
-                  Full details
-                </Link>
-              </div>
-              <p className="text-sm text-gray-700 leading-relaxed">
-                {m.summary.summary_text}
-              </p>
-            </div>
-          ))}
+      {/* Footer */}
+      <div className="border-t bg-muted/30 px-4 py-2">
+        <div className="grid grid-cols-5 gap-4">
+          <div title="Number of models compared"><p className="text-[10px] font-medium uppercase text-muted-foreground">Models</p><p className="text-sm font-semibold">{models.length}</p></div>
+          <div title="Original document word count"><p className="text-[10px] font-medium uppercase text-muted-foreground">Source</p><p className="text-sm font-semibold">{(comparison.word_count ?? 0).toLocaleString()} words</p></div>
+          <div title="Document domain"><p className="text-[10px] font-medium uppercase text-muted-foreground">Domain</p><p className="text-sm font-semibold">{comparison.domain?.toUpperCase()}</p></div>
+          <div title="Best performing model"><p className="text-[10px] font-medium uppercase text-muted-foreground">Best</p><p className="text-sm font-semibold">{comparison.best_model?.toUpperCase() || '—'}</p></div>
+          <div title="Models with evaluation data"><p className="text-[10px] font-medium uppercase text-muted-foreground">Evaluated</p><p className="text-sm font-semibold">{models.filter(m=>m.rouge_l_f!==null).length}/{models.length}</p></div>
         </div>
       </div>
     </div>
