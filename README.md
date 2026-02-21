@@ -5,11 +5,12 @@
   <img src="https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" />
   <img src="https://img.shields.io/badge/HuggingFace-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" />
+  <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white" />
 </p>
 
 # Domain-Specific Abstractive Summarization Research System
 
-A full-stack research platform for comparing **generic vs domain-specific NLP models** on legal and medical document summarization. Upload documents, generate summaries with multiple models, evaluate with comprehensive metrics, and visualize results  —  all from a single web interface.
+A full-stack research platform for comparing **generic vs domain-specific NLP models** on legal and medical document summarization — featuring three **novel research contributions**: Sentence-Level Ensemble Summarization, Cross-Model Consensus Analysis, and an Adaptive Model Recommender. Upload documents, generate summaries with multiple models, evaluate with comprehensive metrics, fuse outputs via ensemble, and visualize results  —  all from a single web interface.
 
 ---
 
@@ -17,6 +18,7 @@ A full-stack research platform for comparing **generic vs domain-specific NLP mo
 
 - [Research Question](#research-question)
 - [Key Features](#key-features)
+- [Novel Research Contributions](#novel-research-contributions)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Setup & Installation](#setup--installation)
@@ -46,6 +48,8 @@ The system tests this hypothesis by comparing six models across two specialized 
 
 **Domains:** Legal (contracts, court opinions, statutes) and Medical (clinical notes, research papers, patient records)
 
+Additionally, the system introduces **three novel contributions** that go beyond standard model comparison — see [Novel Research Contributions](#novel-research-contributions).
+
 ---
 
 ## Key Features
@@ -55,37 +59,129 @@ The system tests this hypothesis by comparing six models across two specialized 
 - **Comprehensive Evaluation** — ROUGE-1/2/L, BERTScore, factuality, semantic similarity, compression ratio
 - **Interactive PDF Viewer** — View uploaded PDFs with color-coded highlights showing which source text each model used
 - **Model Comparison** — Side-by-side metrics with radar charts and per-metric rankings
+- **Sentence-Level Ensemble** — Fuse outputs from all models into a single superior summary via clustering
+- **Cross-Model Consensus** — Measure inter-model agreement with a novel consensus metric and heatmap visualization
+- **Adaptive Model Recommender** — ML-powered prediction of the best model for any document before summarization
 - **Research Dashboard** — Aggregate statistics, domain distribution, model usage trends
 - **Data Export** — Download results as CSV or JSON for external analysis
 - **Experiment Management** — Create, track, and reproduce research experiments
 
 ---
 
+## Novel Research Contributions
+
+Beyond standard model comparison, this system introduces **three novel features** that represent original research contributions:
+
+### 1. Sentence-Level Ensemble Summarization (CGSSE)
+
+> *Cluster-Guided Sentence-Selection Ensemble* — fuses outputs from all models into a single, superior summary.
+
+**Algorithm:**
+
+```
+Input:  Summaries S₁, S₂, ..., Sₙ from N models + source document D
+Output: Ensemble summary E
+
+1. Extract all sentences from S₁ ∪ S₂ ∪ ... ∪ Sₙ
+2. Compute sentence embeddings using SentenceTransformer (all-MiniLM-L6-v2)
+3. Build cosine similarity matrix; greedily cluster sentences with similarity > 0.7
+4. Score each cluster:
+       score = agreement_count × avg_cosine_similarity_to_source
+   where agreement_count = number of distinct models contributing to the cluster
+5. Select representative sentence per cluster (highest source similarity)
+6. Pick top-k clusters by score; order representatives by document position
+7. Join into final ensemble summary E
+```
+
+**Why it's novel:** Unlike traditional ensemble methods that operate at the model-weight level, CGSSE works at the *sentence level* across heterogeneous architectures (BART, PEGASUS, BERT-pipelines, LLMs). It rewards cross-model agreement while maintaining source relevance.
+
+### 2. Cross-Model Consensus Metric (IMSA)
+
+> *Inter-Model Semantic Agreement* — a new evaluation metric measuring how much different models agree on content.
+
+**Algorithm:**
+
+```
+Input:  Summaries S₁, S₂, ..., Sₙ from N models
+Output: Consensus score, agreement matrix, unique content ratios
+
+1. Split each summary into sentences; compute embeddings
+2. Agreement Matrix (N×N):
+   For each model pair (A, B):
+       score(A,B) = avg over sentences a ∈ A of max cosine_sim(a, b) for b ∈ B
+3. Per-sentence consensus:
+   For each sentence s in any model, count how many models have
+   a semantically similar sentence (cosine > 0.7)
+4. Consensus Score = fraction of sentences with agreement count ≥ 2
+5. Unique Content Ratio = per-model fraction of sentences unique to that model
+6. High-Agreement Sentences = top sentences sorted by consensus count
+```
+
+**Why it's novel:** Existing metrics (ROUGE, BERTScore) compare summaries to a *reference*. IMSA compares summaries to *each other*, measuring inter-model agreement without requiring ground-truth references. A high consensus score indicates robust, model-independent content selection.
+
+### 3. Adaptive Model Recommender
+
+> Predicts the best-performing model for a given document *before* summarization.
+
+**Feature Vector (7 dimensions):**
+
+| Feature | Description |
+|---|---|
+| `word_count` | Total words in document |
+| `sentence_count` | Total sentences |
+| `avg_sentence_length` | Average words per sentence |
+| `domain_confidence` | Classifier confidence score |
+| `type_token_ratio` | Vocabulary richness (unique/total words) |
+| `is_legal` | Binary domain indicator |
+| `is_medical` | Binary domain indicator |
+
+**Training:** RandomForest classifier (n_estimators=50, max_depth=5) trained on past evaluation results. The target label for each document is the model that achieved the highest weighted score:
+
+```
+weighted_score = 0.3 × ROUGE-L + 0.3 × BERTScore + 0.2 × Semantic + 0.2 × Factuality
+```
+
+**Fallback:** When insufficient training data exists, a rule-based fallback is used:
+
+- Legal documents → Legal-BERT + PEGASUS
+- Medical documents → Clinical-BERT + PEGASUS
+- Long documents (>2000 words) → Gemini
+- Default → BART
+
+**Why it's novel:** Instead of running all models and comparing after the fact, the recommender predicts the optimal model *a priori*, saving computational resources and providing actionable guidance.
+
+---
+
 ## Architecture
 
 ```
-                          ┌──────────────────────────────────────┐
-                          │         Next.js 16 Frontend          │
-                          │                                      │
-                          │  Documents  |  PDF Viewer  |  Compare│
-                          │  Results    |  Statistics  |  Dashboard
-                          └──────────────────┬───────────────────┘
+                          ┌──────────────────────────────────────────┐
+                          │           Next.js 16 Frontend            │
+                          │                                          │
+                          │  Documents | PDF Viewer | Compare        │
+                          │  Results   | Statistics | Dashboard      │
+                          │  Consensus Heatmap | Ensemble | Recommender
+                          └──────────────────┬───────────────────────┘
                                              │ REST API
-                          ┌──────────────────▼───────────────────┐
-                          │          FastAPI Backend              │
-                          │                                      │
-                          │  ┌──────────┐  ┌──────────────────┐  │
-                          │  │ Document  │  │ Domain Classifier│  │
-                          │  │ Processor │  │ (BART-MNLI)      │  │
-                          │  └──────────┘  └──────────────────┘  │
-                          │  ┌──────────┐  ┌──────────────────┐  │
-                          │  │ Summary  │  │ Evaluation       │  │
-                          │  │ Engine   │  │ (ROUGE/BERT/NLI) │  │
-                          │  └──────────┘  └──────────────────┘  │
-                          │  ┌─────────────────────────────────┐  │
-                          │  │ SQLite (async) + File Storage   │  │
-                          │  └─────────────────────────────────┘  │
-                          └──────────────────────────────────────┘
+                          ┌──────────────────▼───────────────────────┐
+                          │            FastAPI Backend                │
+                          │                                          │
+                          │  ┌──────────┐  ┌──────────────────────┐  │
+                          │  │ Document  │  │ Domain Classifier    │  │
+                          │  │ Processor │  │ (BART-MNLI)          │  │
+                          │  └──────────┘  └──────────────────────┘  │
+                          │  ┌──────────┐  ┌──────────────────────┐  │
+                          │  │ Summary  │  │ Evaluation           │  │
+                          │  │ Engine   │  │ (ROUGE/BERT/NLI)     │  │
+                          │  └──────────┘  └──────────────────────┘  │
+                          │  ┌─────────────────────────────────────┐  │
+                          │  │      Novel Research Modules         │  │
+                          │  │  Ensemble | Consensus | Recommender │  │
+                          │  └─────────────────────────────────────┘  │
+                          │  ┌─────────────────────────────────────┐  │
+                          │  │   SQLite (async) + File Storage     │  │
+                          │  └─────────────────────────────────────┘  │
+                          └──────────────────────────────────────────┘
 ```
 
 ---
@@ -101,6 +197,8 @@ The system tests this hypothesis by comparing six models across two specialized 
 | Evaluation | rouge-score, bert-score, NLI-based factuality |
 | Domain Classification | facebook/bart-large-mnli (zero-shot) |
 | LLM Integration | Google Gemini API (free tier), OpenAI GPT-4 (optional) |
+| Ensemble & Consensus | SentenceTransformers (all-MiniLM-L6-v2), cosine clustering |
+| Model Recommender | scikit-learn RandomForest (with numpy k-NN fallback) |
 | Logging | Loguru |
 
 ### Frontend
@@ -195,11 +293,18 @@ Switch to the **PDF Viewer** tab to see the original document. Toggle model high
 | Green | GPT-4 |
 | Cyan | Legal-BERT + PEGASUS |
 | Pink | Clinical-BERT + PEGASUS |
+| Gold | Ensemble (fused from all models) |
 
 ### 4. Evaluate & Compare
 Navigate to **Compare Models** for side-by-side metrics including ROUGE, BERTScore, factuality, and semantic similarity. View precision/recall breakdowns with the P/R toggle.
 
-### 5. Analyze Results
+### 5. Use Novel Research Features
+
+- **Model Recommendation** — On the document detail page, an ML-powered recommendation panel appears above the model selector, suggesting the best model with confidence scores. The recommended model is auto-selected.
+- **Consensus Analysis** — On the compare page, click **Consensus** to view the N×N agreement heatmap, unique content ratios per model, and high-agreement sentences across all models.
+- **Ensemble Summary** — On the compare page, click **Ensemble** to fuse all existing summaries into a single, superior summary using sentence-level clustering. The ensemble appears as a new row in the comparison table.
+
+### 6. Analyze Results
 Use **Results**, **Statistics**, and **Dashboard** pages for aggregate analysis. Export data as CSV/JSON for publication.
 
 ---
@@ -251,9 +356,9 @@ Each metric also reports **precision** and **recall** variants (visible via the 
 |---|---|---|
 | **Home** | `/` | Quick upload, recent documents, overview |
 | **Documents** | `/documents` | Browse all documents, filter by domain |
-| **Document Detail** | `/documents/[id]` | View info, generate summaries, PDF viewer with highlights |
+| **Document Detail** | `/documents/[id]` | View info, ML model recommendation, generate summaries, PDF viewer with highlights |
 | **Summary Detail** | `/summaries/[id]` | Full summary text and evaluation metrics |
-| **Compare Models** | `/compare/[id]` | Side-by-side model metrics with radar chart |
+| **Compare Models** | `/compare/[id]` | Side-by-side metrics, radar chart, consensus heatmap, ensemble generation |
 | **Experiments** | `/experiments` | Create and manage research experiments |
 | **Results** | `/results` | Filterable table of all evaluation results |
 | **Statistics** | `/statistics` | Per-model and per-domain statistical analysis |
@@ -295,6 +400,15 @@ Each metric also reports **precision** and **recall** variants (visible via the 
 | `POST` | `/api/v1/experiments` | Create an experiment |
 | `GET` | `/api/v1/experiments` | List all experiments |
 | `GET` | `/api/v1/experiments/{id}` | Get experiment details |
+
+### Novel Research Features
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/ensemble/{document_id}` | Generate ensemble summary from all model outputs |
+| `GET` | `/api/v1/consensus/{document_id}` | Compute cross-model consensus metrics and agreement matrix |
+| `GET` | `/api/v1/recommend/{document_id}` | Get ML-powered model recommendation for a document |
+| `POST` | `/api/v1/recommender/train` | Train the recommender on existing evaluation data |
 
 ### Analysis & Export
 
@@ -354,6 +468,9 @@ curl -X POST http://localhost:8000/api/v1/experiments \
 | Domain-Specific Impact | Legal-BERT vs generic models on legal docs |
 | LLM Benchmark | Gemini/GPT-4 vs all other models |
 | Cross-Domain Analysis | Test legal models on medical docs and vice versa |
+| Ensemble vs Individual | Compare ensemble summary quality against best individual model |
+| Consensus Correlation | Analyze whether high consensus score correlates with higher quality |
+| Recommender Accuracy | Train recommender, then evaluate if its predictions match actual best models |
 
 ### Statistical Analysis
 
