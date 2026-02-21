@@ -1,108 +1,134 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=next.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" />
+  <img src="https://img.shields.io/badge/HuggingFace-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" />
+</p>
+
 # Domain-Specific Abstractive Summarization Research System
 
-A comprehensive research system for comparing generic vs domain-specific NLP models for legal and medical document summarization.
+A full-stack research platform for comparing **generic vs domain-specific NLP models** on legal and medical document summarization. Upload documents, generate summaries with multiple models, evaluate with comprehensive metrics, and visualize results  —  all from a single web interface.
+
+---
 
 ## Table of Contents
-- [Overview](#overview)
+
 - [Research Question](#research-question)
+- [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Setup & Installation](#setup--installation)
-- [Usage](#usage)
-- [Running Experiments](#running-experiments)
-- [API Documentation](#api-documentation)
-- [Frontend Features](#frontend-features)
+- [Usage Workflow](#usage-workflow)
+- [Summarization Models](#summarization-models)
 - [Evaluation Metrics](#evaluation-metrics)
-- [Sample Data](#sample-data)
+- [Frontend Pages](#frontend-pages)
+- [API Reference](#api-reference)
+- [Running Experiments](#running-experiments)
 - [Research Guidelines](#research-guidelines)
 - [Troubleshooting](#troubleshooting)
+- [Citation](#citation)
+- [License](#license)
 
-## Overview
-
-This system enables undergraduate research on domain-specific abstractive summarization by providing:
-- Automated document processing and domain classification
-- Multiple summarization models (generic and domain-specific)
-- Comprehensive evaluation metrics (ROUGE, BERTScore, Factuality)
-- Web-based interface for experiment management
-- Automated workflows via n8n
-- Publication-ready experimental results
+---
 
 ## Research Question
 
-**"Does domain-specific NLP significantly improve summarization quality over generic models?"**
+> **Does domain-specific NLP significantly improve summarization quality over generic models?**
 
-The system tests this by comparing:
-- **Generic Models**: BART, PEGASUS, T5
-- **Domain-Specific Models**: Legal-BERT + PEGASUS, Clinical-BERT + PEGASUS
-- **LLM Baseline**: GPT-4
+The system tests this hypothesis by comparing six models across two specialized domains:
 
-On two domains:
-- **Legal**: Contracts, court judgments, legal documents
-- **Medical**: Clinical notes, patient records, medical research papers
+| Generic Models | Domain-Specific Models | LLM Baselines |
+|---|---|---|
+| BART (facebook/bart-large-cnn) | Legal-BERT + PEGASUS | Google Gemini 1.5 Flash |
+| PEGASUS (google/pegasus-cnn_dailymail) | Clinical-BERT + PEGASUS | GPT-4 Turbo (optional) |
+
+**Domains:** Legal (contracts, court opinions, statutes) and Medical (clinical notes, research papers, patient records)
+
+---
+
+## Key Features
+
+- **Multi-Model Summarization** — Generate summaries from 6 different models in one click
+- **Automatic Domain Detection** — Zero-shot classification using BART-MNLI with keyword boosting
+- **Comprehensive Evaluation** — ROUGE-1/2/L, BERTScore, factuality, semantic similarity, compression ratio
+- **Interactive PDF Viewer** — View uploaded PDFs with color-coded highlights showing which source text each model used
+- **Model Comparison** — Side-by-side metrics with radar charts and per-metric rankings
+- **Research Dashboard** — Aggregate statistics, domain distribution, model usage trends
+- **Data Export** — Download results as CSV or JSON for external analysis
+- **Experiment Management** — Create, track, and reproduce research experiments
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Next.js Frontend                        │
-│  (Upload, View Summaries, Compare Models, Dashboard)        │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ REST API
-┌──────────────────────────▼──────────────────────────────────┐
-│                      FastAPI Backend                         │
-│  ┌────────────────┐  ┌──────────────┐  ┌─────────────────┐ │
-│  │ Document       │  │ Domain       │  │ Summarization   │ │
-│  │ Processor      │  │ Classifier   │  │ Engine          │ │
-│  └────────────────┘  └──────────────┘  └─────────────────┘ │
-│  ┌────────────────┐  ┌──────────────┐  ┌─────────────────┐ │
-│  │ Evaluation     │  │ Experiment   │  │ Database        │ │
-│  │ Metrics        │  │ Runner       │  │ (SQLite)        │ │
-│  └────────────────┘  └──────────────┘  └─────────────────┘ │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────┐
-│                    n8n Automation                            │
-│  (Batch Processing, Scheduled Experiments)                   │
-└─────────────────────────────────────────────────────────────┘
+                          ┌──────────────────────────────────────┐
+                          │         Next.js 16 Frontend          │
+                          │                                      │
+                          │  Documents  |  PDF Viewer  |  Compare│
+                          │  Results    |  Statistics  |  Dashboard
+                          └──────────────────┬───────────────────┘
+                                             │ REST API
+                          ┌──────────────────▼───────────────────┐
+                          │          FastAPI Backend              │
+                          │                                      │
+                          │  ┌──────────┐  ┌──────────────────┐  │
+                          │  │ Document  │  │ Domain Classifier│  │
+                          │  │ Processor │  │ (BART-MNLI)      │  │
+                          │  └──────────┘  └──────────────────┘  │
+                          │  ┌──────────┐  ┌──────────────────┐  │
+                          │  │ Summary  │  │ Evaluation       │  │
+                          │  │ Engine   │  │ (ROUGE/BERT/NLI) │  │
+                          │  └──────────┘  └──────────────────┘  │
+                          │  ┌─────────────────────────────────┐  │
+                          │  │ SQLite (async) + File Storage   │  │
+                          │  └─────────────────────────────────┘  │
+                          └──────────────────────────────────────┘
 ```
+
+---
 
 ## Tech Stack
 
 ### Backend
-- **Framework**: FastAPI
-- **Database**: SQLite (PostgreSQL ready)
-- **ML/NLP**: 
-  - Transformers (Hugging Face)
-  - LangChain
-  - PyTorch
-- **Models**:
-  - facebook/bart-large-cnn
-  - google/pegasus-cnn_dailymail
-  - nlpaueb/legal-bert-base-uncased
-  - emilyalsentzer/Bio_ClinicalBERT
-  - **Google Gemini Pro (FREE API!)** - Replaces GPT-4
-- **Evaluation**:
-  - ROUGE (rouge-score)
-  - BERTScore (bert-score)
-  - Sentence Transformers (semantic similarity)
+| Component | Technology |
+|---|---|
+| Framework | FastAPI with async SQLAlchemy |
+| Database | SQLite (async via aiosqlite) |
+| ML/NLP | PyTorch, Hugging Face Transformers, Sentence-Transformers |
+| Evaluation | rouge-score, bert-score, NLI-based factuality |
+| Domain Classification | facebook/bart-large-mnli (zero-shot) |
+| LLM Integration | Google Gemini API (free tier), OpenAI GPT-4 (optional) |
+| Logging | Loguru |
 
 ### Frontend
-- **Framework**: Next.js 14 (App Router)
-- **Styling**: Tailwind CSS
-- **Charts**: Recharts
-- **HTTP Client**: Axios
+| Component | Technology |
+|---|---|
+| Framework | Next.js 16.1.6 (Turbopack) |
+| UI Library | React 19.2.4 |
+| Styling | Tailwind CSS + shadcn/ui (Radix primitives) |
+| Charts | Recharts |
+| PDF Viewer | react-pdf 10.x (pdf.js) |
+| HTTP Client | Axios |
+| Icons | Lucide React |
 
+---
 
 ## Setup & Installation
 
 ### Prerequisites
+
 - Python 3.9+
 - Node.js 18+
-- CUDA-compatible GPU (recommended)
-- **Google Gemini API key (FREE!)** - Get at: https://makersuite.google.com/app/apikey
+- CUDA-compatible GPU (recommended, not required)
+- Google Gemini API key (free) — get one at [Google AI Studio](https://makersuite.google.com/app/apikey)
 
-### 1. Clone Repository
+### 1. Clone the Repository
+
 ```bash
+git clone https://github.com/pallav110/Domain-Specific-Summarization-Research-System.git
 cd "Domain-Specific Summarization Research System"
 ```
 
@@ -111,33 +137,28 @@ cd "Domain-Specific Summarization Research System"
 ```bash
 cd backend
 
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv venv
-
-# Activate virtual environment
 # Windows:
 venv\Scripts\activate
-# Linux/Mac:
+# macOS/Linux:
 source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Create .env file
-copy .env.example .env
+# Create environment file
+cp .env.example .env
+# Edit .env and add: GEMINI_API_KEY=your_key_here
 
-# Edit .env and add your FREE Google Gemini API key
-# Get key at: https://makersuite.google.com/app/apikey
-# GEMINI_API_KEY=your_key_here
-
-# Initialize database
+# Initialize the database
 python -c "import asyncio; from database import init_db; asyncio.run(init_db())"
 
-# Start backend server
+# Start the server
 python main.py
 ```
 
-The backend will start at http://localhost:8000
+Backend runs at **http://localhost:8000** — API docs at **http://localhost:8000/docs**
 
 ### 3. Frontend Setup
 
@@ -147,76 +168,159 @@ cd ../frontend
 # Install dependencies
 npm install
 
-# Start development server
+# Start dev server
 npm run dev
 ```
 
-The frontend will start at http://localhost:3000
+Frontend runs at **http://localhost:3000**
 
-### 4. n8n Setup (Optional)
+---
 
-```bash
-# Install n8n globally
-npm install -g n8n
+## Usage Workflow
 
-# Start n8n
-n8n start
+### 1. Upload a Document
+Navigate to **Documents** and upload a PDF or TXT file. The system automatically extracts text and classifies the domain (legal/medical) with a confidence score.
 
-# Import workflows from n8n/ directory
-```
+### 2. Generate Summaries
+Open a document, select which models to run (BART, PEGASUS, Gemini, Legal-BERT, Clinical-BERT, GPT-4), and click **Generate**. Each model produces an abstractive summary independently.
 
-n8n will start at http://localhost:5678
+### 3. View the PDF with Highlights
+Switch to the **PDF Viewer** tab to see the original document. Toggle model highlights to see which parts of the source each model drew from — color-coded per model:
 
-## Usage
+| Color | Model |
+|---|---|
+| Orange | BART |
+| Violet | PEGASUS |
+| Blue | Gemini |
+| Green | GPT-4 |
+| Cyan | Legal-BERT + PEGASUS |
+| Pink | Clinical-BERT + PEGASUS |
 
-### Basic Workflow
+### 4. Evaluate & Compare
+Navigate to **Compare Models** for side-by-side metrics including ROUGE, BERTScore, factuality, and semantic similarity. View precision/recall breakdowns with the P/R toggle.
 
-1. **Upload Document**
-   - Go to http://localhost:3000
-   - Upload a PDF or TXT file (legal or medical)
-   - System automatically detects domain
+### 5. Analyze Results
+Use **Results**, **Statistics**, and **Dashboard** pages for aggregate analysis. Export data as CSV/JSON for publication.
 
-2. **Generate Summaries**
-   - Navigate to document details
-   - Select models to use
-   - Click "Generate Summaries"
-   - Wait for processing
+---
 
-3. **View Evaluations**
-   - System automatically evaluates each summary
-   - View ROUGE, BERTScore, and factuality scores
+## Summarization Models
 
-4. **Compare Models**
-   - Go to comparison page
-   - View side-by-side metrics
-   - Identify best-performing model
+### Generic Models
 
-5. **Research Dashboard**
-   - View aggregate statistics
-   - Analyze trends across experiments
-   - Export data for publication
+| Model | Description | Speed |
+|---|---|---|
+| **BART** | `facebook/bart-large-cnn` — Denoising autoencoder fine-tuned on CNN/DailyMail | ~3s |
+| **PEGASUS** | `google/pegasus-cnn_dailymail` — Pre-trained with gap-sentence generation | ~3s |
+
+### Domain-Specific Models (Two-Stage Pipeline)
+
+| Model | Stage 1: Extraction | Stage 2: Abstraction | Speed |
+|---|---|---|---|
+| **Legal-BERT + PEGASUS** | `nlpaueb/legal-bert-base-uncased` extracts key sentences | PEGASUS abstracts the extraction | ~38s |
+| **Clinical-BERT + PEGASUS** | `emilyalsentzer/Bio_ClinicalBERT` extracts key sentences | PEGASUS abstracts the extraction | ~38s |
+
+### LLM Baselines
+
+| Model | Description | Speed |
+|---|---|---|
+| **Gemini** | Google Gemini 1.5 Flash with domain-aware prompting (free API) | ~5s |
+| **GPT-4** | OpenAI GPT-4 Turbo (requires paid API key) | ~8s |
+
+---
+
+## Evaluation Metrics
+
+| Metric | What It Measures | Range | Ideal |
+|---|---|---|---|
+| **ROUGE-1** | Unigram overlap between summary and source | 0–1 | Higher |
+| **ROUGE-2** | Bigram overlap | 0–1 | Higher |
+| **ROUGE-L** | Longest common subsequence | 0–1 | Higher |
+| **BERTScore F1** | Semantic similarity via contextual embeddings | 0–1 | Higher |
+| **Factuality** | NLI-based factual consistency with source | 0–1 | Higher |
+| **Semantic Similarity** | Cosine similarity of sentence embeddings | 0–1 | Higher |
+| **Compression Ratio** | Summary length / source length | 0–1 | Lower |
+
+Each metric also reports **precision** and **recall** variants (visible via the P/R toggle on the comparison page).
+
+---
+
+## Frontend Pages
+
+| Page | Route | Description |
+|---|---|---|
+| **Home** | `/` | Quick upload, recent documents, overview |
+| **Documents** | `/documents` | Browse all documents, filter by domain |
+| **Document Detail** | `/documents/[id]` | View info, generate summaries, PDF viewer with highlights |
+| **Summary Detail** | `/summaries/[id]` | Full summary text and evaluation metrics |
+| **Compare Models** | `/compare/[id]` | Side-by-side model metrics with radar chart |
+| **Experiments** | `/experiments` | Create and manage research experiments |
+| **Results** | `/results` | Filterable table of all evaluation results |
+| **Statistics** | `/statistics` | Per-model and per-domain statistical analysis |
+| **Dashboard** | `/dashboard` | Aggregate stats, charts, domain distribution |
+
+---
+
+## API Reference
+
+### Documents
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/documents/upload` | Upload PDF/TXT file |
+| `GET` | `/api/v1/documents` | List all documents |
+| `GET` | `/api/v1/documents/{id}` | Get document details |
+| `GET` | `/api/v1/documents/{id}/file` | Download original file |
+| `DELETE` | `/api/v1/documents/{id}` | Delete document |
+
+### Summarization
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/summarize` | Generate summaries for selected models |
+| `GET` | `/api/v1/summaries/{id}` | Get summary by ID |
+| `GET` | `/api/v1/documents/{id}/summaries` | List summaries for a document |
+
+### Evaluation
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/evaluate/{summary_id}` | Run evaluation metrics on a summary |
+| `GET` | `/api/v1/evaluations/summary/{id}` | Get evaluation results |
+
+### Experiments
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/experiments` | Create an experiment |
+| `GET` | `/api/v1/experiments` | List all experiments |
+| `GET` | `/api/v1/experiments/{id}` | Get experiment details |
+
+### Analysis & Export
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/compare/{document_id}` | Compare all models on a document |
+| `GET` | `/api/v1/dashboard/stats` | Aggregate dashboard statistics |
+| `GET` | `/api/v1/research/results` | Detailed results for analysis |
+| `GET` | `/api/v1/statistics/analysis` | Per-model statistical analysis |
+| `GET` | `/api/v1/export/csv` | Export results as CSV |
+| `GET` | `/api/v1/export/json` | Export results as JSON |
+
+Full interactive docs available at **http://localhost:8000/docs** when the backend is running.
+
+---
 
 ## Running Experiments
 
-### Single Document Experiment
+### Via the Web Interface
 
-```bash
-# Using Python script
-cd backend
-python experiments/run_single_experiment.py --document_id 1
-```
+1. Go to **Experiments** page
+2. Select a document and models to test
+3. Click **Create Experiment**
+4. Results appear automatically with evaluations
 
-### Batch Experiments
-
-```bash
-# Process all documents
-python experiments/run_batch_experiments.py
-
-# Process specific domain
-python experiments/run_batch_experiments.py --domain legal
-```
-
-### Via API
+### Via the API
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/experiments \
@@ -230,310 +334,91 @@ curl -X POST http://localhost:8000/api/v1/experiments \
   }'
 ```
 
-## API Documentation
-
-### Documents
-
-#### Upload Document
-```http
-POST /api/v1/documents/upload
-Content-Type: multipart/form-data
-
-file: <PDF or TXT file>
-```
-
-#### Get Document
-```http
-GET /api/v1/documents/{document_id}
-```
-
-#### List Documents
-```http
-GET /api/v1/documents?skip=0&limit=50&domain=legal
-```
-
-### Summarization
-
-#### Generate Summaries
-```http
-POST /api/v1/summarize
-Content-Type: application/json
-
-{
-  "document_id": 1,
-  "model_types": ["bart", "pegasus", "gemini"],
-  "max_length": 512,
-  "min_length": 100,
-  "use_domain_specific": true
-}
-```
-
-#### Get Summary
-```http
-GET /api/v1/summaries/{summary_id}
-```
-
-### Evaluation
-
-#### Evaluate Summary
-```http
-POST /api/v1/evaluate/{summary_id}?compute_factuality=true
-```
-
-### Experiments
-
-#### Create Experiment
-```http
-POST /api/v1/experiments
-Content-Type: application/json
-
-{
-  "document_id": 1,
-  "experiment_name": "Model Comparison",
-  "models_to_test": ["bart", "pegasus", "gemini"],
-  "evaluate": true
-}
-```
-
-#### Get Experiment Results
-```http
-GET /api/v1/experiments/{experiment_id}
-```
-
-### Comparison & Dashboard
-
-#### Compare Models
-```http
-GET /api/v1/compare/{document_id}
-```
-
-#### Dashboard Statistics
-```http
-GET /api/v1/dashboard/stats
-```
-
-#### Research Results
-```http
-GET /api/v1/research/results?domain=legal
-```
-
-## Frontend Features
-
-### Pages
-
-1. **Home** (`/`)
-   - Quick upload
-   - Recent documents
-   - Research overview
-
-2. **Documents** (`/documents`)
-   - List all documents
-   - Filter by domain
-   - Upload new documents
-
-3. **Document Detail** (`/documents/[id]`)
-   - View document info
-   - Generate summaries
-   - View all summaries
-
-4. **Experiments** (`/experiments`)
-   - Create experiments
-   - View experiment results
-   - Compare models
-
-5. **Dashboard** (`/dashboard`)
-   - Aggregate statistics
-   - Charts and visualizations
-   - Research insights
-
-## Evaluation Metrics
-
-### ROUGE (Recall-Oriented Understudy for Gisting Evaluation)
-- **ROUGE-1**: Unigram overlap
-- **ROUGE-2**: Bigram overlap
-- **ROUGE-L**: Longest common subsequence
-- **Range**: 0.0 to 1.0 (higher is better)
-
-### BERTScore
-- Semantic similarity using contextual embeddings
-- **Precision**: How much of summary is supported
-- **Recall**: How much of source is covered
-- **F1**: Harmonic mean
-- **Range**: 0.0 to 1.0 (higher is better)
-
-### Factuality Score
-- NLI-based or overlap-based consistency check
-- Measures factual accuracy
-- **Range**: 0.0 to 1.0 (higher is better)
-
-### Compression Ratio
-- Summary length / Source length
-- **Lower values** = more compression
-
-### Semantic Similarity
-- Cosine similarity of sentence embeddings
-- **Range**: 0.0 to 1.0 (higher is better)
-
-## Sample Data
-
-Sample documents are provided in `sample_data/`:
-
-### Legal Documents
-- `employment_contract.txt` - Employment agreement
-- Use for testing legal domain classification
-
-### Medical Documents
-- `patient_record.txt` - Patient medical record
-- Use for testing medical domain classification
-
-### Loading Sample Data
-
-```bash
-cd backend
-python scripts/load_sample_data.py
-```
+---
 
 ## Research Guidelines
 
-### For Undergraduate Research Projects
+### Recommended Experiment Design
 
-#### 1. Hypothesis Formation
-- **H1**: Domain-specific models outperform generic models on domain-specific metrics
-- **H2**: GPT-4 provides best overall performance but at higher cost
+1. **Collect Data** — Upload at least 10 documents per domain (20+ total)
+2. **Run All Models** — Generate summaries with all 6 models for each document
+3. **Evaluate** — Run evaluations to get ROUGE, BERTScore, factuality, and semantic similarity
+4. **Compare** — Use the Statistics page for per-model averages and standard deviations
+5. **Export** — Download CSV/JSON for statistical analysis in Python/R
 
-#### 2. Experimental Design
-- Test each model on minimum 10 documents per domain (20 total)
-- Use same evaluation criteria across all models
-- Document all hyperparameters
+### Suggested Experiments
 
-#### 3. Data Collection
+| Experiment | Goal |
+|---|---|
+| Generic Model Baseline | Compare BART vs PEGASUS across both domains |
+| Domain-Specific Impact | Legal-BERT vs generic models on legal docs |
+| LLM Benchmark | Gemini/GPT-4 vs all other models |
+| Cross-Domain Analysis | Test legal models on medical docs and vice versa |
+
+### Statistical Analysis
+
 ```python
-# Export results to CSV
 import pandas as pd
-from database import async_session_maker
-from models.db_models import Experiment, Summary, Evaluation
 
-# Fetch all evaluations
-# Create DataFrame
-# Export to CSV for analysis
+# Load exported results
+df = pd.read_csv("research_results.csv")
+
+# Per-model averages
+print(df.groupby("model_type")[["rouge_l_f", "bertscore_f1", "factuality_score"]].mean())
+
+# Paired t-test between models
+from scipy.stats import ttest_rel
+bart = df[df.model_type == "bart"]["rouge_l_f"]
+legal = df[df.model_type == "legal_bert_pegasus"]["rouge_l_f"]
+t_stat, p_val = ttest_rel(bart, legal)
+print(f"t={t_stat:.3f}, p={p_val:.4f}")
 ```
-
-#### 4. Statistical Analysis
-- Calculate mean and standard deviation for each metric
-- Perform paired t-tests between models
-- Create visualization comparing models
-
-#### 5. Publication Preparation
-- Use dashboard charts for figures
-- Export results table for paper
-- Document methodology thoroughly
-
-### Recommended Experiments
-
-1. **Experiment 1: Generic Model Comparison**
-   - Compare BART, PEGASUS, T5
-   - Measure baseline performance
-
-2. **Experiment 2: Domain-Specific Impact**
-   - Compare generic vs Legal-BERT for legal docs
-   - Compare generic vs Clinical-BERT for medical docs
-
-3. **Experiment 3: LLM Benchmark**
-   - Compare GPT-4 with all other models
-   - Analyze cost vs quality tradeoff
-
-4. **Experiment 4: Cross-Domain Analysis**
-   - Test legal models on medical docs (and vice versa)
-   - Measure domain specificity importance
-
-## Troubleshooting
-
-### Backend Issues
-
-**Models taking too long to load:**
-```bash
-# Download models in advance
-python scripts/download_models.py
-```
-
-**Out of memory errors:**
-```python
-# In config.py, reduce batch size or use CPU
-DEVICE = "cpu"
-```
-
-**Database errors:**
-```bash
-# Reset database
-rm research_system.db
-python -c "import asyncio; from database import init_db; asyncio.run(init_db())"
-```
-
-### Frontend Issues
-
-**API connection errors:**
-- Check backend is running on port 8000
-- Verify NEXT_PUBLIC_API_URL in .env.local
-
-**Build errors:**
-```bash
-# Clear cache and reinstall
-rm -rf .next node_modules
-npm install
-npm run dev
-```
-
-### Model Issues
-
-**CUDA errors:**
-```python
-# Force CPU usage in config.py
-import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-```
-
-**OpenAI API errors:**
-- Verify API key in backend/.env
-- Check API quota and billing
-
-## Citation
-
-If you use this system for research, please cite:
-
-```bibtex
-@software{domain_summarization_2026,
-  title={Domain-Specific Abstractive Summarization Research System},
-  author={Your Name},
-  year={2026},
-  url={https://github.com/yourusername/repo}
-}
-```
-
-## License
-
-MIT License - See LICENSE file
-
-## Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## Support
-
-For questions or issues:
-- Open a GitHub issue
-- Email: your.email@university.edu
-
-## Acknowledgments
-
-- Hugging Face for transformer models
-- OpenAI for GPT-4 API
-- FastAPI and Next.js teams
-- Research advisors and collaborators
 
 ---
 
-**Happy researching.**
+## Troubleshooting
+
+### Backend
+
+| Problem | Solution |
+|---|---|
+| Models slow to load | First run downloads ~5GB of models. Subsequent runs use cache in `./models_cache` |
+| Out of memory (OOM) | Set `DEVICE = "cpu"` in `backend/config.py` |
+| Database errors | Delete `research_system.db` and re-initialize: `python -c "import asyncio; from database import init_db; asyncio.run(init_db())"` |
+| Gemini API errors | Verify `GEMINI_API_KEY` in `.env`. Free tier allows 15 RPM |
+
+### Frontend
+
+| Problem | Solution |
+|---|---|
+| API connection refused | Ensure backend is running on port 8000. Check `NEXT_PUBLIC_API_URL` in `frontend/.env.local` |
+| Build errors | Delete `.next` and `node_modules`, then `npm install && npm run dev` |
+| PDF viewer not loading | Requires the document to be a PDF (`.txt` files show the viewer tab as disabled) |
+
+---
+
+## Citation
+
+```bibtex
+@software{domain_summarization_2026,
+  title   = {Domain-Specific Abstractive Summarization Research System},
+  author  = {Pallav},
+  year    = {2026},
+  url     = {https://github.com/pallav110/Domain-Specific-Summarization-Research-System}
+}
+```
+
+---
+
+## License
+
+MIT License — See [LICENSE](LICENSE) for details.
+
+---
+
+## Acknowledgments
+
+- [Hugging Face](https://huggingface.co/) for transformer models and the Transformers library
+- [Google AI](https://ai.google.dev/) for Gemini API free tier
+- [FastAPI](https://fastapi.tiangolo.com/) and [Next.js](https://nextjs.org/) teams
+- [shadcn/ui](https://ui.shadcn.com/) for the component library
