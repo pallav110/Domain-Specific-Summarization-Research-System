@@ -2,6 +2,7 @@
 FastAPI Application - Main Entry Point
 """
 from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -217,6 +218,29 @@ async def get_document(document_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Document not found")
     
     return document
+
+
+@app.get("/api/v1/documents/{document_id}/file")
+async def get_document_file(document_id: int, db: AsyncSession = Depends(get_db)):
+    """Serve the original uploaded document file"""
+    result = await db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not os.path.exists(document.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    media_type = "application/pdf" if document.file_type == "pdf" else "text/plain"
+
+    return FileResponse(
+        path=document.file_path,
+        media_type=media_type,
+        filename=document.original_filename,
+    )
 
 
 @app.get("/api/v1/documents", response_model=List[DocumentDetail])
