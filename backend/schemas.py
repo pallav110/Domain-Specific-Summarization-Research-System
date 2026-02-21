@@ -22,6 +22,7 @@ class ModelType(str, Enum):
     CLINICAL_BERT_PEGASUS = "clinical_bert_pegasus"
     GEMINI = "gemini"  # Google Gemini (FREE!)
     GPT = "gpt"  # OpenAI GPT (optional, paid)
+    ENSEMBLE = "ensemble"  # Sentence-level ensemble (Novelty)
 
 
 # Document Schemas
@@ -201,3 +202,43 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ==================== NOVELTY SCHEMAS ====================
+
+class EnsembleSummaryResponse(BaseModel):
+    """Ensemble summary response (Novelty 1)"""
+    summary_id: int
+    summary_text: str
+    summary_length: int
+    generation_time: float
+    source_models: List[str]
+    clusters_formed: int
+    clusters_selected: int
+
+
+class ConsensusResponse(BaseModel):
+    """Cross-model consensus response (Novelty 2)"""
+    document_id: int
+    consensus_score: float
+    unique_content_ratio: Dict[str, float]
+    agreement_matrix: Dict[str, Dict[str, float]]
+    total_sentences_analyzed: int
+    high_agreement_count: int
+    high_agreement_sentences: List[Dict[str, Any]]
+
+
+class RecommendationResponse(BaseModel):
+    """Model recommendation response (Novelty 3)"""
+    document_id: int
+    recommended_model: str
+    confidence: float
+    reasoning: str
+    all_scores: Dict[str, float]
+
+
+class TrainRecommenderResponse(BaseModel):
+    """Recommender training response (Novelty 3)"""
+    samples_used: int
+    models_in_training: List[str]
+    message: str

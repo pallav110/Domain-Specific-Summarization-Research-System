@@ -4,14 +4,14 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import axios from 'axios'
 import Link from 'next/link'
-import { Loader2, ArrowLeft, BarChart3, Trophy, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowLeft, BarChart3, Trophy, AlertTriangle, Sparkles, GitMerge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis,
-  PolarRadiusAxis, Radar
+  PolarRadiusAxis, Radar, Cell
 } from 'recharts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -122,9 +122,40 @@ interface Summary { id: number; document_id: number; model_type: string; model_n
 interface Document { id: number; original_filename: string; word_count: number; detected_domain: string; domain_confidence: number }
 interface Evaluation { rouge_1_f: number | null; rouge_2_f: number | null; rouge_l_f: number | null; rouge_1_p?: number | null; rouge_1_r?: number | null; rouge_l_p?: number | null; rouge_l_r?: number | null; bertscore_f1: number | null; bertscore_precision?: number | null; bertscore_recall?: number | null; factuality_score: number | null; semantic_similarity: number | null; compression_ratio: number | null }
 
+// Consensus response types
+interface HighAgreementSentence {
+  sentence: string
+  source_model: string
+  agreeing_models: string[]
+  consensus_count: number
+  consensus_ratio: number
+}
+
+interface ConsensusData {
+  document_id: number
+  consensus_score: number
+  unique_content_ratio: Record<string, number>
+  agreement_matrix: Record<string, Record<string, number>>
+  total_sentences_analyzed: number
+  high_agreement_count: number
+  high_agreement_sentences: HighAgreementSentence[]
+}
+
+// Ensemble response types
+interface EnsembleData {
+  summary_id: number
+  summary_text: string
+  summary_length: number
+  generation_time: number
+  source_models: string[]
+  clusters_formed: number
+  clusters_selected: number
+}
+
 const MODEL_COLORS: Record<string, string> = {
   bart: '#f97316', pegasus: '#8b5cf6', gemini: '#3b82f6', gpt: '#10b981',
   t5: '#ef4444', legal_bert_pegasus: '#06b6d4', clinical_bert_pegasus: '#ec4899',
+  ensemble: '#facc15',
 }
 
 export default function ComparePage() {
@@ -135,6 +166,12 @@ export default function ComparePage() {
   const [loading, setLoading] = useState(true)
   const [evaluatingAll, setEvaluatingAll] = useState(false)
   const [showPR, setShowPR] = useState(false)
+
+  // Novelty state
+  const [consensus, setConsensus] = useState<ConsensusData | null>(null)
+  const [loadingConsensus, setLoadingConsensus] = useState(false)
+  const [generatingEnsemble, setGeneratingEnsemble] = useState(false)
+  const [ensembleResult, setEnsembleResult] = useState<EnsembleData | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -190,6 +227,35 @@ export default function ComparePage() {
       setComparison(transformAPIResponse(res.data))
     } catch {}
     setEvaluatingAll(false)
+  }
+
+  const fetchConsensus = async () => {
+    setLoadingConsensus(true)
+    try {
+      const res = await axios.get<ConsensusData>(`${API_URL}/api/v1/consensus/${documentId}`)
+      setConsensus(res.data)
+    } catch (err) {
+      console.error('Failed to fetch consensus:', err)
+    }
+    setLoadingConsensus(false)
+  }
+
+  const generateEnsemble = async () => {
+    setGeneratingEnsemble(true)
+    try {
+      const res = await axios.post<EnsembleData>(`${API_URL}/api/v1/ensemble/${documentId}`)
+      setEnsembleResult(res.data)
+      // Refresh comparison data to include the new ensemble row
+      try {
+        const refreshRes = await axios.get<APIComparisonResponse>(`${API_URL}/api/v1/compare/${documentId}`)
+        setComparison(transformAPIResponse(refreshRes.data))
+      } catch {
+        // Fallback: just keep existing data
+      }
+    } catch (err) {
+      console.error('Failed to generate ensemble:', err)
+    }
+    setGeneratingEnsemble(false)
   }
 
   const getModelColor = (model: string) => MODEL_COLORS[model?.toLowerCase()] || '#6b7280'
@@ -254,6 +320,26 @@ export default function ComparePage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchConsensus}
+            disabled={loadingConsensus}
+            title="Compute cross-model consensus metrics (Novelty 2)"
+          >
+            {loadingConsensus ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <GitMerge className="mr-1.5 h-3.5 w-3.5" />}
+            Consensus
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateEnsemble}
+            disabled={generatingEnsemble}
+            title="Generate sentence-level ensemble summary (Novelty 1)"
+          >
+            {generatingEnsemble ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+            Ensemble
+          </Button>
           {hasEvals && (
             <button
               onClick={() => setShowPR(!showPR)}
@@ -385,6 +471,125 @@ export default function ComparePage() {
               </div>
             )}
           </div>
+
+          {/* Ensemble Result */}
+          {ensembleResult && (
+            <div className="rounded-md border border-yellow-300 bg-yellow-50 px-4 py-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-yellow-600" />
+                <h3 className="text-sm font-semibold text-yellow-800">Ensemble Summary (Novelty 1)</h3>
+                <span className="rounded bg-yellow-200 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700">
+                  {ensembleResult.clusters_selected}/{ensembleResult.clusters_formed} clusters
+                </span>
+                <span className="text-[10px] text-yellow-600">
+                  from {ensembleResult.source_models.map(m => m.toUpperCase()).join(', ')}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-yellow-900">{ensembleResult.summary_text}</p>
+              <div className="mt-2 flex gap-4 text-[10px] text-yellow-600">
+                <span>{ensembleResult.summary_length} words</span>
+                <span>{ensembleResult.generation_time.toFixed(2)}s</span>
+              </div>
+            </div>
+          )}
+
+          {/* Consensus Analysis */}
+          {consensus && (
+            <div className="space-y-4 rounded-md border border-blue-200 bg-blue-50/50 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <GitMerge className="h-4 w-4 text-blue-600" />
+                <h3 className="text-sm font-semibold text-blue-800">Cross-Model Consensus (Novelty 2)</h3>
+                <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                  {(consensus.consensus_score * 100).toFixed(1)}%
+                </span>
+                <span className="text-[10px] text-blue-500">
+                  {consensus.total_sentences_analyzed} sentences analyzed &middot; {consensus.high_agreement_count} high agreement
+                </span>
+              </div>
+
+              {/* Agreement Matrix Heatmap */}
+              <div>
+                <h4 className="mb-1.5 text-[11px] font-medium uppercase text-blue-700">Pairwise Agreement Matrix</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-auto border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="px-2 py-1 text-[10px] text-blue-700"></th>
+                        {Object.keys(consensus.agreement_matrix).map(m => (
+                          <th key={m} className="px-2 py-1 text-[10px] font-medium text-blue-700">{m.toUpperCase()}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(consensus.agreement_matrix).map(([rowModel, cols]) => (
+                        <tr key={rowModel}>
+                          <td className="px-2 py-1 text-[10px] font-medium text-blue-700">{rowModel.toUpperCase()}</td>
+                          {Object.entries(cols).map(([colModel, value]) => {
+                            const intensity = Math.round(value * 255)
+                            const bg = rowModel === colModel
+                              ? '#dbeafe'
+                              : `rgba(59, 130, 246, ${(value * 0.7).toFixed(2)})`
+                            return (
+                              <td
+                                key={colModel}
+                                className="px-2 py-1 text-center text-[10px] font-mono"
+                                style={{ backgroundColor: bg, color: intensity > 160 ? '#1e3a5f' : '#1e3a5f' }}
+                                title={`${rowModel.toUpperCase()} → ${colModel.toUpperCase()}: ${value.toFixed(4)}`}
+                              >
+                                {value.toFixed(2)}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Unique Content Ratio */}
+              <div>
+                <h4 className="mb-1.5 text-[11px] font-medium uppercase text-blue-700">Unique Content Ratio (per model)</h4>
+                <div className="h-[160px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={Object.entries(consensus.unique_content_ratio).map(([model, ratio]) => ({ model: model.toUpperCase(), ratio: Math.round(ratio * 100) }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="model" tick={{ fontSize: 10 }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v}%`} />
+                      <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v: number) => `${v}%`} />
+                      <Bar dataKey="ratio" name="Unique %">
+                        {Object.keys(consensus.unique_content_ratio).map((model) => (
+                          <Cell key={model} fill={getModelColor(model)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* High Agreement Sentences */}
+              {consensus.high_agreement_sentences.length > 0 && (
+                <div>
+                  <h4 className="mb-1.5 text-[11px] font-medium uppercase text-blue-700">Top Consensus Sentences</h4>
+                  <div className="space-y-1.5">
+                    {consensus.high_agreement_sentences.slice(0, 8).map((s, i) => (
+                      <div key={i} className="flex items-start gap-2 rounded bg-white/70 px-2.5 py-1.5">
+                        <span className="mt-0.5 shrink-0 rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                          {s.consensus_count}/{Object.keys(consensus.agreement_matrix).length}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] leading-snug text-blue-900">{s.sentence}</p>
+                          <p className="mt-0.5 text-[9px] text-blue-400">
+                            from {s.source_model.toUpperCase()} &middot; agreed by {s.agreeing_models.map(m => m.toUpperCase()).join(', ')}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Side-by-Side Summaries */}
           <div>

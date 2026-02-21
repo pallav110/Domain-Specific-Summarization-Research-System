@@ -23,6 +23,7 @@ class ModelType(str, enum.Enum):
     CLINICAL_BERT_PEGASUS = "clinical_bert_pegasus"
     GEMINI = "gemini"  # Google Gemini (FREE!)
     GPT = "gpt"  # OpenAI GPT (optional, paid)
+    ENSEMBLE = "ensemble"  # Sentence-level ensemble (Novelty)
 
 
 class Document(Base):

@@ -21,6 +21,9 @@ from models.domain_classifier import DomainClassifier
 from models.document_processor import DocumentProcessor
 from models.summarizers import SummarizationEngine
 from models.evaluator import EvaluationMetrics, ComparativeAnalysis
+from models.ensemble import SentenceLevelEnsemble
+from models.consensus import ConsensusAnalyzer
+from models.recommender import ModelRecommender
 from schemas import (
     DocumentUploadResponse,
     DocumentDetail,
@@ -62,6 +65,9 @@ document_processor = None
 summarization_engine = None
 evaluation_metrics = None
 comparative_analysis = None
+sentence_ensemble = None
+consensus_analyzer = None
+model_recommender = None
 
 
 @app.on_event("startup")
@@ -69,13 +75,14 @@ async def startup_event():
     """Initialize database and models on startup"""
     global domain_classifier, document_processor, summarization_engine
     global evaluation_metrics, comparative_analysis
-    
+    global sentence_ensemble, consensus_analyzer, model_recommender
+
     logger.info("Starting application...")
-    
+
     # Initialize database
     await init_db()
     logger.info("Database initialized")
-    
+
     # Initialize ML components
     logger.info("Initializing ML components...")
     domain_classifier = DomainClassifier()
@@ -86,7 +93,13 @@ async def startup_event():
     summarization_engine = SummarizationEngine()
     evaluation_metrics = EvaluationMetrics()
     comparative_analysis = ComparativeAnalysis()
-    
+
+    # Initialize novelty components (reuse the SentenceTransformer already loaded)
+    sentence_ensemble = SentenceLevelEnsemble(evaluation_metrics.semantic_model)
+    consensus_analyzer = ConsensusAnalyzer(evaluation_metrics.semantic_model)
+    model_recommender = ModelRecommender()
+    logger.info("Novelty components initialized (ensemble, consensus, recommender)")
+
     logger.info("Application started successfully!")
 
 
@@ -516,6 +529,10 @@ async def delete_document(
 # Include extended API routes
 from api_extended import router as extended_router
 app.include_router(extended_router)
+
+# Include novelty API routes
+from api_novelties import router as novelties_router
+app.include_router(novelties_router)
 
 
 if __name__ == "__main__":
