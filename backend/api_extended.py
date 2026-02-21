@@ -214,26 +214,38 @@ async def compare_models(document_id: int, db: AsyncSession = Depends(get_db)):
                 detail="No summaries found for this document"
             )
         
-        # Build comparison
-        models = []
+        # Build comparison (deduplicate by summary_id, keep latest evaluation)
+        seen: dict[int, ModelComparison] = {}
         for summary, evaluation in summaries_data:
+            if summary.id in seen:
+                continue
+            metrics = EvaluationMetricsSchema()
             if evaluation:
-                model_comp = ModelComparison(
-                    model_name=summary.model_name,
-                    model_type=summary.model_type,
-                    summary_length=summary.summary_length,
-                    generation_time=summary.generation_time or 0.0,
-                    metrics=EvaluationMetricsSchema(
-                        rouge_1_f=evaluation.rouge_1_f,
-                        rouge_2_f=evaluation.rouge_2_f,
-                        rouge_l_f=evaluation.rouge_l_f,
-                        bertscore_f1=evaluation.bertscore_f1,
-                        factuality_score=evaluation.factuality_score,
-                        compression_ratio=evaluation.compression_ratio,
-                        semantic_similarity=evaluation.semantic_similarity
-                    )
+                metrics = EvaluationMetricsSchema(
+                    rouge_1_f=evaluation.rouge_1_f,
+                    rouge_1_p=evaluation.rouge_1_p,
+                    rouge_1_r=evaluation.rouge_1_r,
+                    rouge_2_f=evaluation.rouge_2_f,
+                    rouge_l_f=evaluation.rouge_l_f,
+                    rouge_l_p=evaluation.rouge_l_p,
+                    rouge_l_r=evaluation.rouge_l_r,
+                    bertscore_f1=evaluation.bertscore_f1,
+                    bertscore_precision=evaluation.bertscore_precision,
+                    bertscore_recall=evaluation.bertscore_recall,
+                    factuality_score=evaluation.factuality_score,
+                    compression_ratio=evaluation.compression_ratio,
+                    semantic_similarity=evaluation.semantic_similarity
                 )
-                models.append(model_comp)
+            seen[summary.id] = ModelComparison(
+                model_name=summary.model_name,
+                model_type=summary.model_type,
+                summary_id=summary.id,
+                summary_length=summary.summary_length,
+                generation_time=summary.generation_time or 0.0,
+                summary_text=summary.summary_text or "",
+                metrics=metrics
+            )
+        models = list(seen.values())
         
         # Determine best model
         if models:
@@ -259,7 +271,9 @@ async def compare_models(document_id: int, db: AsyncSession = Depends(get_db)):
         
         return ComparisonResponse(
             document_id=document.id,
+            document_name=document.original_filename or "",
             domain=document.detected_domain,
+            word_count=document.word_count or 0,
             models=models,
             best_overall=best_overall,
             recommendations=recommendations
@@ -369,28 +383,33 @@ async def get_research_results(
         result = await db.execute(query)
         data = result.all()
         
-        # Format results
+        # Format results - deduplicate by (experiment_id, summary_id)
         results = []
+        seen = set()
         for exp, summary, evaluation, doc in data:
-            if evaluation:
-                results.append({
-                    'experiment_id': exp.id,
-                    'experiment_name': exp.experiment_name,
-                    'domain': str(doc.detected_domain.value),
-                    'model_type': str(summary.model_type.value),
-                    'model_name': summary.model_name,
-                    'rouge_1': evaluation.rouge_1_f or 0.0,
-                    'rouge_2': evaluation.rouge_2_f or 0.0,
-                    'rouge_l': evaluation.rouge_l_f or 0.0,
-                    'bertscore': evaluation.bertscore_f1 or 0.0,
-                    'factuality': evaluation.factuality_score or 0.0,
-                    'generation_time': summary.generation_time or 0.0,
-                    'compression_ratio': evaluation.compression_ratio or 0.0,
-                    'timestamp': exp.started_at.isoformat()
-                })
-        
+            key = (exp.id, summary.id)
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append({
+                'experiment_id': exp.id,
+                'experiment_name': exp.experiment_name,
+                'domain': str(doc.detected_domain.value),
+                'model_type': str(summary.model_type.value),
+                'model_name': summary.model_name,
+                'rouge_1_f': evaluation.rouge_1_f if evaluation else None,
+                'rouge_2_f': evaluation.rouge_2_f if evaluation else None,
+                'rouge_l_f': evaluation.rouge_l_f if evaluation else None,
+                'bertscore_f1': evaluation.bertscore_f1 if evaluation else None,
+                'factuality_score': evaluation.factuality_score if evaluation else None,
+                'semantic_similarity': evaluation.semantic_similarity if evaluation else None,
+                'compression_ratio': evaluation.compression_ratio if evaluation else None,
+                'generation_time': summary.generation_time,
+                'created_at': exp.started_at.isoformat()
+            })
+
         return {
-            'total_results': len(results),
+            'total': len(results),
             'results': results
         }
         
@@ -617,15 +636,15 @@ async def get_statistical_analysis(
                 reverse=True
             )
             rankings[metric] = [
-                {'model': m, 'mean': s.get(metric, {}).get('mean', 0)}
+                {'model': m, 'mean_score': s.get(metric, {}).get('mean', 0)}
                 for m, s in ranked
             ]
-        
+
         return {
             'total_evaluations': len(data),
             'models_tested': list(model_stats.keys()),
-            'per_model_statistics': model_stats,
-            'per_domain_analysis': domain_analysis,
+            'model_statistics': model_stats,
+            'domain_analysis': domain_analysis,
             'rankings': rankings,
             'analysis_timestamp': datetime.utcnow().isoformat()
         }

@@ -291,10 +291,13 @@ class DomainSpecificSummarizer(BaseSummarizer):
             summary = summary.replace(".<n>", ". ").replace("<n>", " ").strip()
             generation_time = time.time() - start_time
             
+            # Map domain to model type name matching ModelType enum
+            type_name = "clinical_bert_pegasus" if self.domain == "medical" else f"{self.domain}_bert_pegasus"
+
             return {
                 "summary": summary,
-                "model_name": f"{self.domain}_bert_pegasus",
-                "model_type": f"{self.domain}_bert_pegasus",
+                "model_name": type_name,
+                "model_type": type_name,
                 "generation_time": generation_time,
                 "summary_length": len(summary.split()),
                 "domain": self.domain,

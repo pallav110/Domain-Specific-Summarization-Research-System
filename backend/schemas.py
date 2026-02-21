@@ -40,6 +40,7 @@ class DocumentDetail(BaseModel):
     """Detailed document information"""
     id: int
     filename: str
+    original_filename: str
     file_size: int
     file_type: str
     word_count: int
@@ -87,9 +88,15 @@ class SummaryResponse(BaseModel):
 class EvaluationMetrics(BaseModel):
     """Evaluation metrics"""
     rouge_1_f: Optional[float] = None
+    rouge_1_p: Optional[float] = None
+    rouge_1_r: Optional[float] = None
     rouge_2_f: Optional[float] = None
     rouge_l_f: Optional[float] = None
+    rouge_l_p: Optional[float] = None
+    rouge_l_r: Optional[float] = None
     bertscore_f1: Optional[float] = None
+    bertscore_precision: Optional[float] = None
+    bertscore_recall: Optional[float] = None
     factuality_score: Optional[float] = None
     compression_ratio: Optional[float] = None
     semantic_similarity: Optional[float] = None
@@ -145,15 +152,19 @@ class ModelComparison(BaseModel):
     """Model comparison data"""
     model_name: str
     model_type: ModelType
+    summary_id: int
     summary_length: int
     generation_time: float
+    summary_text: str = ""
     metrics: EvaluationMetrics
 
 
 class ComparisonResponse(BaseModel):
     """Comparison response"""
     document_id: int
+    document_name: str = ""
     domain: DomainType
+    word_count: int = 0
     models: List[ModelComparison]
     best_overall: str
     recommendations: List[str]

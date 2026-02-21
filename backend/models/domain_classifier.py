@@ -105,16 +105,20 @@ class DomainClassifier:
                 scores['legal'] = combined_legal
                 scores['medical'] = combined_medical
             
-            # Determine domain
-            if scores['legal'] > scores['medical'] and scores['legal'] > 0.5:
+            # Determine domain - pick the higher-scoring domain unless
+            # both scores are very low (below 0.25)
+            legal = scores['legal']
+            medical = scores['medical']
+
+            if legal > medical and legal > 0.25:
                 domain = "legal"
-                confidence = scores['legal']
-            elif scores['medical'] > scores['legal'] and scores['medical'] > 0.5:
+                confidence = legal
+            elif medical >= legal and medical > 0.25:
                 domain = "medical"
-                confidence = scores['medical']
+                confidence = medical
             else:
                 domain = "unknown"
-                confidence = max(scores['legal'], scores['medical'])
+                confidence = max(legal, medical)
             
             detailed_scores = {
                 "legal_score": scores['legal'],

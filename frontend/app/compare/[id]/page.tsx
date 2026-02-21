@@ -16,6 +16,22 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+interface EvalMetrics {
+  rouge_1_f: number | null
+  rouge_1_p: number | null
+  rouge_1_r: number | null
+  rouge_2_f: number | null
+  rouge_l_f: number | null
+  rouge_l_p: number | null
+  rouge_l_r: number | null
+  bertscore_f1: number | null
+  bertscore_precision: number | null
+  bertscore_recall: number | null
+  factuality_score: number | null
+  compression_ratio: number | null
+  semantic_similarity: number | null
+}
+
 interface ModelComparison {
   model_type: string
   model_name: string
@@ -38,6 +54,27 @@ interface ModelComparison {
   compression_ratio: number | null
 }
 
+// Raw API response shape (metrics nested under `metrics`)
+interface APIModelComparison {
+  model_type: string
+  model_name: string
+  summary_id: number
+  summary_length: number
+  generation_time: number
+  summary_text: string
+  metrics: EvalMetrics
+}
+
+interface APIComparisonResponse {
+  document_id: number
+  document_name: string
+  domain: string
+  word_count: number
+  models: APIModelComparison[]
+  best_overall: string
+  recommendations: string[]
+}
+
 interface ComparisonResponse {
   document_id: number
   document_name: string
@@ -46,6 +83,38 @@ interface ComparisonResponse {
   models: ModelComparison[]
   best_model: string
   recommendations: string[]
+}
+
+function transformAPIResponse(api: APIComparisonResponse): ComparisonResponse {
+  return {
+    document_id: api.document_id,
+    document_name: api.document_name,
+    domain: api.domain,
+    word_count: api.word_count,
+    best_model: api.best_overall,
+    recommendations: api.recommendations,
+    models: api.models.map(m => ({
+      model_type: m.model_type,
+      model_name: m.model_name,
+      summary_id: m.summary_id,
+      summary_length: m.summary_length,
+      generation_time: m.generation_time,
+      summary_text: m.summary_text,
+      rouge_1_f: m.metrics?.rouge_1_f ?? null,
+      rouge_2_f: m.metrics?.rouge_2_f ?? null,
+      rouge_l_f: m.metrics?.rouge_l_f ?? null,
+      rouge_1_p: m.metrics?.rouge_1_p ?? null,
+      rouge_1_r: m.metrics?.rouge_1_r ?? null,
+      rouge_l_p: m.metrics?.rouge_l_p ?? null,
+      rouge_l_r: m.metrics?.rouge_l_r ?? null,
+      bertscore_f1: m.metrics?.bertscore_f1 ?? null,
+      bertscore_precision: m.metrics?.bertscore_precision ?? null,
+      bertscore_recall: m.metrics?.bertscore_recall ?? null,
+      factuality_score: m.metrics?.factuality_score ?? null,
+      semantic_similarity: m.metrics?.semantic_similarity ?? null,
+      compression_ratio: m.metrics?.compression_ratio ?? null,
+    })),
+  }
 }
 
 // Fallback types for manual fetching
@@ -71,8 +140,8 @@ export default function ComparePage() {
     const fetchData = async () => {
       try {
         // Try the compare API first
-        const res = await axios.get<ComparisonResponse>(`${API_URL}/api/v1/compare/${documentId}`)
-        setComparison(res.data)
+        const res = await axios.get<APIComparisonResponse>(`${API_URL}/api/v1/compare/${documentId}`)
+        setComparison(transformAPIResponse(res.data))
       } catch {
         // Fallback: manually assemble from individual endpoints
         try {
@@ -117,8 +186,8 @@ export default function ComparePage() {
         try { await axios.post(`${API_URL}/api/v1/evaluate/${m.summary_id}`) } catch {}
       }
       // Refresh
-      const res = await axios.get<ComparisonResponse>(`${API_URL}/api/v1/compare/${documentId}`)
-      setComparison(res.data)
+      const res = await axios.get<APIComparisonResponse>(`${API_URL}/api/v1/compare/${documentId}`)
+      setComparison(transformAPIResponse(res.data))
     } catch {}
     setEvaluatingAll(false)
   }
@@ -240,8 +309,8 @@ export default function ComparePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...models].sort((a, b) => weightedScore(b) - weightedScore(a)).map((m) => (
-                    <tr key={m.summary_id} className={cn('border-b border-transparent hover:bg-muted/50', comparison.best_model === m.model_type && 'bg-amber-50/50')}>
+                  {[...models].sort((a, b) => weightedScore(b) - weightedScore(a)).map((m, i) => (
+                    <tr key={m.summary_id ?? `${m.model_type}-${i}`} className={cn('border-b border-transparent hover:bg-muted/50', comparison.best_model === m.model_type && 'bg-amber-50/50')}>
                       <td className="sticky left-0 bg-background px-3 py-1.5">
                         <div className="flex items-center gap-1.5">
                           <div className="h-2 w-2 rounded-full" style={{ backgroundColor: getModelColor(m.model_type) }} />
@@ -321,8 +390,8 @@ export default function ComparePage() {
           <div>
             <h3 className="mb-2 text-[11px] font-medium uppercase text-muted-foreground">Summary Text</h3>
             <div className="space-y-2">
-              {models.map((m) => (
-                <div key={m.summary_id} className="rounded-md border px-3 py-2" style={{ borderLeftWidth: '3px', borderLeftColor: getModelColor(m.model_type) }}>
+              {models.map((m, i) => (
+                <div key={m.summary_id ?? `${m.model_type}-${i}`} className="rounded-md border px-3 py-2" style={{ borderLeftWidth: '3px', borderLeftColor: getModelColor(m.model_type) }}>
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-xs font-semibold">{m.model_type.toUpperCase()}</span>
                     <Link href={`/summaries/${m.summary_id}`} className="text-[11px] text-primary hover:underline" title="View full summary details">Details</Link>
